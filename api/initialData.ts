@@ -1,4 +1,4 @@
-import { Property, Revenue, Expense, Booking, Asset, Maintenance, PropertyOrigin, ExpenseCategory, AssetCategory, BookingStatus, MaintenanceStatus, MaintenanceType } from "../types";
+import { Property, Revenue, Expense, Booking, Asset, Maintenance, PropertyOrigin, ExpenseCategory, AssetCategory, BookingStatus, MaintenanceStatus, MaintenanceType } from "../src/types";
 
 export const INITIAL_PROPERTIES: Property[] = [
   {

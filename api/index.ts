@@ -1,50 +1,40 @@
 import express from "express";
 import path from "path";
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import dns from "dns";
+
+import { Property, Revenue, Expense, Booking, Asset, Maintenance, ExpenseCategory } from "../src/types";
+import { 
+  INITIAL_PROPERTIES, 
+  INITIAL_REVENUES, 
+  INITIAL_EXPENSES, 
+  INITIAL_BOOKINGS, 
+  INITIAL_ASSETS, 
+  INITIAL_MAINTENANCES 
+} from "./initialData";
 
 dns.setDefaultResultOrder("ipv4first");
 
-enum PropertyOrigin { AIRBNB = 'Airbnb', BOOKING = 'Booking', CONTRATO = 'Contrato', TEMPORADA = 'Temporada', LOCACAO_DIRETA = 'Locação Direta', OUTROS = 'Outros' }
-enum ExpenseCategory { MANUTENCAO = 'Manutenção', PISCINA = 'Piscina', LIMPEZA = 'Limpeza', FUNCIONARIOS = 'Funcionários', INTERNET = 'Internet', AGUA = 'Água', ENERGIA = 'Energia', JARDINAGEM = 'Jardinagem', ALIMENTACAO = 'Alimentação', MOVEIS = 'Móveis', UTENSILIOS = 'Utensílios', ELETRONICOS = 'Eletrônicos', COMISSOES = 'Comissões', TAXAS = 'Taxas', IMPOSTOS = 'Impostos', OUTROS = 'Outros' }
-enum BookingStatus { CONFIRMADA = 'Confirmada', PENDENTE = 'Pendente', CONCLUIDA = 'Concluída', CANCELADA = 'Cancelada' }
-enum AssetCategory { MOVEIS = 'Móveis', ELETRONICOS = 'Eletrônicos', ELETRODOMESTICOS = 'Eletrodomésticos', EQUIPAMENTOS = 'Equipamentos', PISCINA = 'Piscina', JARDIM = 'Jardim', AR_CONDICIONADO = 'Ar-condicionado' }
-enum MaintenanceType { PREVENTIVA = 'Preventiva', CORRETIVA = 'Corretiva', EMERGENCIAL = 'Emergencial' }
-enum MaintenanceStatus { AGENDADA = 'Agendada', EM_ANDAMENTO = 'Em Andamento', CONCLUIDA = 'Concluída' }
+let properties: Property[] = [...INITIAL_PROPERTIES];
+let revenues: Revenue[] = [...INITIAL_REVENUES];
+let expenses: Expense[] = [...INITIAL_EXPENSES];
+let bookings: Booking[] = [...INITIAL_BOOKINGS];
+let assets: Asset[] = [...INITIAL_ASSETS];
+let maintenances: Maintenance[] = [...INITIAL_MAINTENANCES];
 
-interface Property { id: string; name: string; location: string; description: string; image?: string; stars?: number; rooms?: number; sizeSqM?: number; }
-interface Revenue { id: string; propertyId: string; origin: PropertyOrigin; value: number; taxes: number; date: string; description: string; attachment?: string; }
-interface Expense { id: string; propertyId: string; category: ExpenseCategory; supplier: string; date: string; value: number; receipt?: string; paymentMethod: string; description: string; }
-interface Booking { id: string; propertyId: string; guestName: string; origin: PropertyOrigin; checkIn: string; checkOut: string; value: number; commission: number; status: BookingStatus; phone?: string; documents?: string[]; notes?: string; }
-interface Asset { id: string; propertyId: string; name: string; category: AssetCategory; value: number; purchaseDate: string; warrantyUntil?: string; lifeSpanYears?: number; location?: string; photoUrl?: string; invoiceNumber?: string; }
-interface Maintenance { id: string; propertyId: string; title: string; type: MaintenanceType; status: MaintenanceStatus; date: string; cost: number; notes?: string; }
-interface SystemAlert { id: string; propertyId?: string; type: "warning" | "info" | "success" | "danger"; title: string; message: string; date: string; }
-interface Supplier { id: string; name: string; specialty: string; contactName: string; phone: string; email?: string; }
-interface Document { id: string; name: string; type: string; description: string; date: string; fileSize?: string; fileUrl?: string; }
-interface User { id: string; name: string; username: string; password?: string; role: 'admin' | 'user'; }
-
-let properties: Property[] = [
-  { id: "casa-lilian", name: "Casa Lilian", location: "São Sebastião, SP", description: "Mansão espetacular com vista para o mar", image: "/assets/casa-lilian.png", stars: 4.9, rooms: 5, sizeSqM: 450 },
-  { id: "casa-nova", name: "Casa Nova", location: "Trancoso, BA", description: "Arquitetura contemporânea com decoração minimalista", image: "/assets/casa-nova.png", stars: 4.8, rooms: 4, sizeSqM: 380 },
-  { id: "casa-mayla", name: "Casa Mayla", location: "Ipojuca, PE", description: "Bangalô pé na areia", image: "/assets/casa-mayla.png", stars: 4.95, rooms: 6, sizeSqM: 520 }
-];
-let revenues: Revenue[] = [];
-let expenses: Expense[] = [];
-let bookings: Booking[] = [];
-let assets: Asset[] = [];
-let maintenances: Maintenance[] = [];
-
-let suppliers: Supplier[] = [
+let suppliers = [
   { id: "sup-1", name: "AcquaClean Pools", specialty: "Piscineiro Técnico Especializado", contactName: "João Piscineiro", phone: "(11) 98012-9021", email: "joao@acquaclean.com" }
 ];
 
-let documents: Document[] = [
+let documents = [
   { id: "doc-1", name: "Regulamento_Interno_Villa_Lilian.pdf", type: "Regulamento", description: "Manual de Conduta de Lazer", date: "2026-06-01", fileSize: "1.2 MB" }
 ];
 
 let alerts = [
   { id: "alert-1", propertyId: "casa-mayla", type: "warning", title: "Manutenção de Piscina Pendente", message: "A desinfecção periódica expira em 2 dias.", date: "2026-06-06" }
 ];
+
+interface User { id: string; name: string; username: string; password?: string; role: 'admin' | 'user'; }
 
 let users: User[] = [
   { id: "u1", name: "Administrador", username: "admin", password: "admin123", role: "admin" },
