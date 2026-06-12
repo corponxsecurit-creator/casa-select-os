@@ -41,9 +41,9 @@ import {
   Trophy
 } from "lucide-react";
 import { getProperties, getRevenues, getExpenses, getBookings, getAssets, getMaintenances, getSuppliers, getDocuments, changePassword } from "./data/api";
-import { Sidebar } from "./components/Sidebar";
+import Sidebar from "./components/Sidebar";
 import KPICards from "./components/KPICards";
-import { PropertyDetails } from "./components/PropertyDetails";
+import PropertyDetails from "./components/PropertyDetails";
 import CommandCenter from "./components/CommandCenter";
 import OCRScanner from "./components/OCRScanner";
 import SenseiChat from "./components/SenseiChat";
