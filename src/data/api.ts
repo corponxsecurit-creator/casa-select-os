@@ -309,3 +309,22 @@ export async function sendWhatsAppMessage(payload: {
   return res.json();
 }
 
+export async function loginUser(username: string, password: string): Promise<any> {
+  const res = await fetch(`${BASE_URL}/api/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password })
+  });
+  if (!res.ok) throw new Error("Credenciais inválidas");
+  return res.json();
+}
+
+export async function changePassword(userId: string, newPassword: string): Promise<any> {
+  const res = await fetch(`${BASE_URL}/api/users/${userId}/password`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ newPassword })
+  });
+  if (!res.ok) throw new Error("Erro ao trocar senha");
+  return res.json();
+}

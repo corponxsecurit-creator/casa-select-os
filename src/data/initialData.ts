@@ -6,7 +6,7 @@ export const INITIAL_PROPERTIES: Property[] = [
     name: "Casa Lilian",
     location: "São Sebastião, SP",
     description: "Mansão espetacular com vista para o mar, piscina de borda infinita e área gourmet integrada de altíssimo padrão.",
-    image: "https://images.unsplash.com/photo-1613977257363-707ba9348227?auto=format&fit=crop&w=800&q=80",
+    image: "/assets/casa-lilian.png",
     stars: 4.9,
     rooms: 5,
     sizeSqM: 450
@@ -16,7 +16,7 @@ export const INITIAL_PROPERTIES: Property[] = [
     name: "Casa Nova",
     location: "Trancoso, BA",
     description: "Arquitetura contemporânea com decoração minimalista, decks integrados e cercada por natureza exuberante.",
-    image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80",
+    image: "/assets/casa-nova.png",
     stars: 4.8,
     rooms: 4,
     sizeSqM: 380
@@ -26,7 +26,7 @@ export const INITIAL_PROPERTIES: Property[] = [
     name: "Casa Mayla",
     location: "Ipojuca, PE (Porto de Galinhas)",
     description: "Bangalô pé na areia com acesso direto às piscinas naturais, 4 suítes luxuosas e serviço de praia completo.",
-    image: "https://images.unsplash.com/photo-1499793983690-e29da59ef1c2?auto=format&fit=crop&w=800&q=80",
+    image: "/assets/casa-mayla.png",
     stars: 4.95,
     rooms: 6,
     sizeSqM: 520
@@ -36,7 +36,7 @@ export const INITIAL_PROPERTIES: Property[] = [
     name: "Casa Caio",
     location: "Campos do Jordão, SP",
     description: "Chale de alto luxo na montanha com lareira central de pedra, adega climatizada e jacuzzi externa aquecida.",
-    image: "https://images.unsplash.com/photo-1542718610-a1d656d1884c?auto=format&fit=crop&w=800&q=80",
+    image: "/assets/casa-caio.png",
     stars: 4.75,
     rooms: 3,
     sizeSqM: 220
@@ -46,7 +46,7 @@ export const INITIAL_PROPERTIES: Property[] = [
     name: "Predinho",
     location: "Leblon, Rio de Janeiro, RJ",
     description: "Edifício boutique a uma quadra da praia, contendo 3 apartamentos integrados para locação corporativa premium.",
-    image: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=800&q=80",
+    image: "/assets/predinho.png",
     stars: 4.9,
     rooms: 9,
     sizeSqM: 600
@@ -56,7 +56,7 @@ export const INITIAL_PROPERTIES: Property[] = [
     name: "Casa Vintage",
     location: "Ubatuba, SP",
     description: "Casarão histórico restaurado com móveis de design dos anos 60 e 70, com SPA privativo e horta orgânica.",
-    image: "https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?auto=format&fit=crop&w=800&q=80",
+    image: "/assets/casa-vintage.png",
     stars: 4.8,
     rooms: 4,
     sizeSqM: 310
@@ -66,7 +66,7 @@ export const INITIAL_PROPERTIES: Property[] = [
     name: "Casa Amado",
     location: "Ilhéus, BA",
     description: "Ambiente inspirado na literatura de Jorge Amado. Casarão amplo no topo da colina com vista deslumbrante e pomar.",
-    image: "https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=800&q=80",
+    image: "/assets/casa-amado.png",
     stars: 4.85,
     rooms: 5,
     sizeSqM: 410

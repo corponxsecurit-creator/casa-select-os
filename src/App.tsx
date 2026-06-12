@@ -40,23 +40,25 @@ import {
   TrendingDown,
   Trophy
 } from "lucide-react";
-import Sidebar from "./components/Sidebar";
+import { getProperties, getRevenues, getExpenses, getBookings, getAssets, getMaintenances, getSuppliers, getDocuments, changePassword } from "./data/api";
+import { Sidebar } from "./components/Sidebar";
 import KPICards from "./components/KPICards";
+import { PropertyDetails } from "./components/PropertyDetails";
 import CommandCenter from "./components/CommandCenter";
-import PropertyDetails from "./components/PropertyDetails";
 import OCRScanner from "./components/OCRScanner";
 import SenseiChat from "./components/SenseiChat";
 import ForecastView from "./components/ForecastView";
 import PWASimulator from "./components/PWASimulator";
 import IncomeTaxView from "./components/IncomeTaxView";
+import { LoginScreen } from "./components/LoginScreen";
 import { 
-  getProperties, getRevenues, getExpenses, getBookings, getAssets, getMaintenances, getAlerts,
+  getAlerts,
   addProperty, addRevenue, addExpense, addBooking, addAsset, addMaintenance, deleteExpense,
   updateProperty, deleteProperty, updateRevenue, deleteRevenue, updateExpense, updateBooking, deleteBooking,
-  updateAsset, deleteAsset, updateMaintenance, deleteMaintenance, getSuppliers, addSupplier, updateSupplier, deleteSupplier,
-  getDocuments, addDocument, updateDocument, deleteDocument, sendWhatsAppMessage
+  updateAsset, deleteAsset, updateMaintenance, deleteMaintenance, addSupplier, updateSupplier, deleteSupplier,
+  addDocument, updateDocument, deleteDocument, sendWhatsAppMessage
 } from "./data/api";
-import { Property, Revenue, Expense, Booking, Asset, Maintenance, SystemAlert, PropertyOrigin, ExpenseCategory, AssetCategory, BookingStatus, MaintenanceStatus, MaintenanceType, Supplier, Document } from "./types";
+import { Property, Revenue, Expense, Booking, Asset, Maintenance, SystemAlert, PropertyOrigin, ExpenseCategory, AssetCategory, BookingStatus, MaintenanceStatus, MaintenanceType, Supplier, Document, User } from "./types";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, Cell, PieChart, Pie } from "recharts";
 
 // ─── Property Carousel Hook ─────────────────────────────────────────
@@ -105,6 +107,10 @@ export default function App() {
   const [activeTab, setActiveTab] = React.useState<string>("dashboard");
   const [selectedPropertyId, setSelectedPropertyId] = React.useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = React.useState<boolean>(false);
+  const [currentUser, setCurrentUser] = React.useState<User | null>(null);
+  const [showPasswordChange, setShowPasswordChange] = React.useState(false);
+  const [newPassword, setNewPassword] = React.useState("");
+  const [passwordChangeMessage, setPasswordChangeMessage] = React.useState("");
 
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -354,7 +360,9 @@ export default function App() {
     }
   };
 
-
+  if (!currentUser) {
+    return <LoginScreen onLogin={setCurrentUser} />;
+  }
 
   // Notifications bell panel open state
   const [notifOpen, setNotifOpen] = React.useState<boolean>(false);
@@ -848,6 +856,16 @@ export default function App() {
   const CHART_GREEN = "#34d399";
   const CHART_RED = "#e17055";
 
+  // Top level carousels to avoid "Rendered more hooks" errors (Rules of Hooks)
+  const DASH_ORDER = React.useMemo(() => ["casa-lilian", "casa-nova", "casa-mayla", "predinho", "casa-vintage", "casa-amado"], []);
+  const dashCarouselProps = React.useMemo(() => {
+    return properties
+      .filter(p => DASH_ORDER.includes(p.id))
+      .sort((a, b) => DASH_ORDER.indexOf(a.id) - DASH_ORDER.indexOf(b.id));
+  }, [properties, DASH_ORDER]);
+  const dashCarousel = usePropertyCarousel(dashCarouselProps.length, 5000);
+  const heroCarousel = usePropertyCarousel(properties.length, 6000);
+
   // Monthly breakdown chart values
   const monthlyFlowData = [
     { month: "Nov/25", receitas: 45000, despesas: 15600 },
@@ -861,6 +879,37 @@ export default function App() {
   return (
     <div id="app-root-container" className="flex min-h-screen bg-[#FAFAFA] dark:bg-[#050B14] text-slate-900 dark:text-slate-100 overflow-x-hidden font-sans">
       
+      {showPasswordChange && (
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-md z-[60] flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 w-full max-w-sm shadow-2xl relative">
+            <h3 className="text-xl font-bold text-white mb-4">Trocar Senha</h3>
+            {passwordChangeMessage && (
+              <div className="bg-slate-800/50 text-emerald-400 p-3 rounded mb-4 text-sm border border-emerald-500/20">{passwordChangeMessage}</div>
+            )}
+            <input 
+              type="password" 
+              value={newPassword} 
+              onChange={e => setNewPassword(e.target.value)} 
+              placeholder="Nova senha" 
+              className="w-full bg-slate-950 border border-slate-800 text-white rounded-lg p-3 mb-4"
+            />
+            <div className="flex gap-2">
+              <button onClick={() => setShowPasswordChange(false)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-2 rounded-lg text-sm font-bold">Cancelar</button>
+              <button onClick={async () => {
+                if(!newPassword || !currentUser) return;
+                try {
+                  await changePassword(currentUser.id, newPassword);
+                  setPasswordChangeMessage("Senha alterada com sucesso!");
+                  setTimeout(() => { setShowPasswordChange(false); setPasswordChangeMessage(""); setNewPassword(""); }, 2000);
+                } catch(e) {
+                  setPasswordChangeMessage("Erro ao alterar senha.");
+                }
+              }} className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 py-2 rounded-lg text-sm font-bold">Salvar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Sidebar navigation */}
       <Sidebar 
         activeTab={activeTab} 
@@ -893,9 +942,23 @@ export default function App() {
             </button>
             
             <div className="flex flex-col">
-              <span className="font-sans font-extrabold text-xs md:text-sm text-slate-900 dark:text-white leading-tight">Bom dia, Admin 👋</span>
+              <span className="font-sans font-extrabold text-xs md:text-sm text-slate-900 dark:text-white leading-tight">Bom dia, {currentUser.name} 👋</span>
               <span className="text-[9px] md:text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-medium">Aqui está o resumo geral das suas propriedades</span>
             </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setShowPasswordChange(true)}
+              className="text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-emerald-500 transition-colors"
+            >
+              Trocar Senha
+            </button>
+            <button 
+              onClick={() => setCurrentUser(null)}
+              className="text-xs font-bold text-red-500/80 hover:text-red-500 transition-colors"
+            >
+              Sair
+            </button>
           </div>
 
           <div className="flex items-center gap-3.5 text-xs font-medium">
@@ -1021,11 +1084,7 @@ export default function App() {
 
                   {/* ══ Visão das propriedades — Carrossel Interativo ══ */}
                   {(() => {
-                    const ORDER = ["casa-lilian", "casa-nova", "casa-mayla", "predinho", "casa-vintage", "casa-amado"];
-                    const carouselProps = properties
-                      .filter(p => ORDER.includes(p.id))
-                      .sort((a, b) => ORDER.indexOf(a.id) - ORDER.indexOf(b.id));
-
+                    const carouselProps = dashCarouselProps;
                     const ODATA: Record<string, { label: string; color: string; booking: string; roi: string; occ: number }> = {
                       "casa-lilian":  { label: "Alta Ocupação",  color: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30", booking: "12 nov · 7 noites",  roi: "31,4%", occ: 92 },
                       "casa-nova":    { label: "Alta Ocupação",  color: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30", booking: "14 nov · 5 noites",  roi: "28,8%", occ: 88 },
@@ -1035,7 +1094,6 @@ export default function App() {
                       "casa-amado":   { label: "Média Ocupação", color: "bg-amber-500/15 text-amber-400 border-amber-500/30",   booking: "16 nov · 6 noites",  roi: "19,7%", occ: 68 },
                     };
 
-                    const dashCarousel = usePropertyCarousel(carouselProps.length, 5000);
                     const cp = carouselProps[dashCarousel.idx];
                     if (!cp) return null;
 
@@ -1680,7 +1738,6 @@ export default function App() {
                       "casa-amado":   { label: "Média Ocupação", color: "text-amber-400 border-amber-500/40 bg-amber-500/15",   occ: 68, roi: "19.7%" },
                     };
 
-                    const heroCarousel = usePropertyCarousel(properties.length, 6000);
                     const hp = properties[heroCarousel.idx];
                     if (!hp) return null;
                     const hRevs = revenues.filter(r => r.propertyId === hp.id).reduce((s, r) => s + r.value, 0);
@@ -2922,6 +2979,12 @@ export default function App() {
                   <label className="text-[10px] text-slate-500 uppercase block">Breve Descrição Estratégica</label>
                   <textarea value={formProperty.description} onChange={(e) => setFormProperty({ ...formProperty, description: e.target.value })} className="w-full bg-slate-950 border border-slate-850 p-2 rounded text-white font-sans text-xs" placeholder="Mansão espetacular pé na areia" />
                 </div>
+
+                <div>
+                  <label className="block text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Foto da Propriedade (Link da imagem)</label>
+                  <input type="text" value={formProperty.image} onChange={(e) => setFormProperty({ ...formProperty, image: e.target.value })} className="w-full bg-slate-950 border border-slate-850 p-2 rounded text-white font-mono text-xs" placeholder="/assets/foto.png ou https://..." />
+                </div>
+                
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
                     <label className="text-[10px] text-slate-500 uppercase block">Dormitórios / Suítes</label>

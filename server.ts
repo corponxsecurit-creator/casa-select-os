@@ -57,6 +57,16 @@ let alerts = [
   }
 ];
 
+import { User } from "./src/types";
+
+let users: User[] = [
+  { id: "u1", name: "Administrador", username: "admin", password: "admin123", role: "admin" },
+  { id: "u2", name: "Hugo Kobayashi", username: "hugo", password: "mudar123", role: "user" },
+  { id: "u3", name: "Katia Farah", username: "katia", password: "mudar123", role: "user" },
+  { id: "u4", name: "Mariana Nina", username: "mariana", password: "mudar123", role: "user" },
+  { id: "u5", name: "Rubens Bossi", username: "rubens", password: "mudar123", role: "user" },
+];
+
 // Lazy-evaluate Gemini Client
 let aiClient: GoogleGenAI | null = null;
 function getGenAI(): GoogleGenAI | null {
@@ -85,6 +95,29 @@ async function startServer() {
   app.use(express.json({ limit: "25mb" }));
 
   // API Endpoints
+
+  app.post("/api/login", (req, res) => {
+    const { username, password } = req.body;
+    const user = users.find(u => u.username === username && u.password === password);
+    if (user) {
+      res.json(user);
+    } else {
+      res.status(401).json({ error: "Credenciais inválidas" });
+    }
+  });
+
+  app.put("/api/users/:id/password", (req, res) => {
+    const { id } = req.params;
+    const { newPassword } = req.body;
+    const user = users.find(u => u.id === id);
+    if (user) {
+      user.password = newPassword;
+      res.json(user);
+    } else {
+      res.status(404).json({ error: "Usuário não encontrado" });
+    }
+  });
+
   app.get("/api/properties", (req, res) => {
     res.json(properties);
   });
@@ -110,12 +143,8 @@ async function startServer() {
     if (index !== -1) {
       properties[index] = {
         ...properties[index],
-        name: req.body.name || properties[index].name,
-        location: req.body.location || properties[index].location,
-        description: req.body.description || properties[index].description,
-        image: req.body.image || properties[index].image,
-        rooms: req.body.rooms !== undefined ? Number(req.body.rooms) : properties[index].rooms,
-        sizeSqM: req.body.sizeSqM !== undefined ? Number(req.body.sizeSqM) : properties[index].sizeSqM,
+        ...req.body,
+        id: properties[index].id // ensure id doesn't change
       };
       res.json(properties[index]);
     } else {
