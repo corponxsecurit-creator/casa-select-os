@@ -21,6 +21,7 @@ interface Maintenance { id: string; propertyId: string; title: string; type: Mai
 interface SystemAlert { id: string; propertyId?: string; type: "warning" | "info" | "success" | "danger"; title: string; message: string; date: string; }
 interface Supplier { id: string; name: string; specialty: string; contactName: string; phone: string; email?: string; }
 interface Document { id: string; name: string; type: string; description: string; date: string; fileSize?: string; fileUrl?: string; }
+interface User { id: string; name: string; username: string; password?: string; role: 'admin' | 'user'; }
 
 let properties: Property[] = [
   { id: "casa-lilian", name: "Casa Lilian", location: "São Sebastião, SP", description: "Mansão espetacular com vista para o mar", image: "/assets/casa-lilian.png", stars: 4.9, rooms: 5, sizeSqM: 450 },
@@ -43,6 +44,14 @@ let documents: Document[] = [
 
 let alerts = [
   { id: "alert-1", propertyId: "casa-mayla", type: "warning", title: "Manutenção de Piscina Pendente", message: "A desinfecção periódica expira em 2 dias.", date: "2026-06-06" }
+];
+
+let users: User[] = [
+  { id: "u1", name: "Administrador", username: "admin", password: "admin123", role: "admin" },
+  { id: "u2", name: "Hugo Kobayashi", username: "hugo", password: "mudar123", role: "user" },
+  { id: "u3", name: "Katia Farah", username: "katia", password: "mudar123", role: "user" },
+  { id: "u4", name: "Mariana Nina", username: "mariana", password: "mudar123", role: "user" },
+  { id: "u5", name: "Rubens Bossi", username: "rubens", password: "mudar123", role: "user" },
 ];
 
 let aiClient: GoogleGenAI | null = null;
@@ -86,5 +95,27 @@ app.get("/api/ai/forecast", (req, res) => res.json([{ month: "Jun", revenue: 100
 
 app.post("/api/ai/chat", (req, res) => res.json({ text: "Simulação de resposta da IA." }));
 app.post("/api/ai/ocr", (req, res) => res.json({ value: 850.00, date: "2026-06-03", supplier: "FrioMax", category: ExpenseCategory.MANUTENCAO, propertyId: "casa-lilian", description: "Recarga de gás" }));
+
+app.post("/api/login", (req, res) => {
+  const { username, password } = req.body;
+  const user = users.find(u => u.username === username && u.password === password);
+  if (user) {
+    res.json(user);
+  } else {
+    res.status(401).json({ error: "Credenciais inválidas" });
+  }
+});
+
+app.put("/api/users/:id/password", (req, res) => {
+  const { id } = req.params;
+  const { newPassword } = req.body;
+  const user = users.find(u => u.id === id);
+  if (user) {
+    user.password = newPassword;
+    res.json(user);
+  } else {
+    res.status(404).json({ error: "Not found" });
+  }
+});
 
 export default app;
