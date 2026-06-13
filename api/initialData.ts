@@ -1,4 +1,4 @@
-import { Property, Revenue, Expense, Booking, Asset, Maintenance, PropertyOrigin, ExpenseCategory, AssetCategory, BookingStatus, MaintenanceStatus, MaintenanceType } from "../src/types";
+import { Property, Revenue, Expense, Booking, Asset, Maintenance, PropertyOrigin, ExpenseCategory, AssetCategory, BookingStatus, MaintenanceStatus, MaintenanceType } from "../src/types.js";
 
 export const INITIAL_PROPERTIES: Property[] = [
   {
@@ -70,6 +70,55 @@ export const INITIAL_PROPERTIES: Property[] = [
     stars: 4.85,
     rooms: 5,
     sizeSqM: 410
+  },
+  {
+    id: "casa-49",
+    name: "Casa 49",
+    location: "Granja Viana, SP",
+    description: "Arquitetura moderna e iluminação que exalta cada detalhe. Fachada imponente em condomínio de alto padrão.",
+    image: "/assets/casa-49.jpg",
+    stars: 5.0,
+    rooms: 5,
+    sizeSqM: 650
+  },
+  {
+    id: "casa-512",
+    name: "Casa 512",
+    location: "Granja Viana — Brasil",
+    description: "A mansão mais luxuosa da Granja Viana",
+    image: "/assets/casa-512.jpg",
+    stars: 5.0,
+    rooms: 4,
+    bathrooms: 7,
+    guests: 12,
+    pricePerNight: 3000,
+    sizeSqM: 800
+  },
+  {
+    id: "casa-select-garden",
+    name: "Casa Select Garden",
+    location: "Interior — Brasil",
+    description: "Refúgio elegante com jardim, varanda e decoração contemporânea.",
+    image: "/assets/casa-select-garden.jpg",
+    stars: 5.0,
+    rooms: 4,
+    bathrooms: 5,
+    guests: 10,
+    pricePerNight: 980,
+    sizeSqM: 450
+  },
+  {
+    id: "casa-select-coast",
+    name: "Casa Select Coast",
+    location: "Praia — Brasil",
+    description: "Casa de praia com vista, piscina e acesso facilitado ao mar.",
+    image: "/assets/casa-select-coast.jpg",
+    stars: 4.9,
+    rooms: 5,
+    bathrooms: 6,
+    guests: 12,
+    pricePerNight: 1450,
+    sizeSqM: 500
   }
 ];
 
@@ -152,6 +201,34 @@ export const INITIAL_REVENUES: Revenue[] = [
     taxes: 0,
     date: "2026-05-08",
     description: "Casamento intimista - Fim de semana completo"
+  },
+  // Casa 512
+  {
+    id: "rev-512-1",
+    propertyId: "casa-512",
+    origin: PropertyOrigin.AIRBNB,
+    value: 5010.96,
+    taxes: 239.04,
+    date: "2026-04-22",
+    description: "Reserva Airbnb - Ycaro Tavares (Pix: Katia Barboza Farah)"
+  },
+  {
+    id: "rev-512-2",
+    propertyId: "casa-512",
+    origin: PropertyOrigin.AIRBNB,
+    value: 11214.99,
+    taxes: 0,
+    date: "2026-04-27",
+    description: "Reserva Airbnb - Caio Henrique"
+  },
+  {
+    id: "rev-512-3",
+    propertyId: "casa-512",
+    origin: PropertyOrigin.AIRBNB,
+    value: 5965.42,
+    taxes: 0,
+    date: "2026-05-03",
+    description: "Reserva Airbnb - Elza Falcao"
   }
 ];
 
@@ -283,6 +360,18 @@ export const INITIAL_EXPENSES: Expense[] = [
     receipt: "Guia paga",
     paymentMethod: "Pix",
     description: "Contas de água e saneamento - Consumo integral"
+  },
+  // Casa 512
+  {
+    id: "exp-512-1",
+    propertyId: "casa-512",
+    category: ExpenseCategory.LIMPEZA,
+    supplier: "Rosilene Ribeiro do Nascimento",
+    date: "2026-04-19",
+    value: 50.00,
+    receipt: "Comprovante NuBank",
+    paymentMethod: "Pix",
+    description: "Serviço de limpeza / taxa de faxina"
   }
 ];
 
@@ -388,6 +477,43 @@ export const INITIAL_BOOKINGS: Booking[] = [
     commission: 1642.02,
     status: BookingStatus.CONCLUIDA,
     notes: "Locação para ensaio fotográfico editorial."
+  },
+  // Casa 512
+  {
+    id: "bk-512-1",
+    propertyId: "casa-512",
+    guestName: "Ycaro Tavares",
+    origin: PropertyOrigin.AIRBNB,
+    checkIn: "2026-04-20",
+    checkOut: "2026-04-22",
+    value: 5010.96,
+    commission: 239.04,
+    status: BookingStatus.CONCLUIDA,
+    notes: "Reserva de 2 noites. Limpeza (R$ 250). Taxa serviço (R$ 239.04)."
+  },
+  {
+    id: "bk-512-2",
+    propertyId: "casa-512",
+    guestName: "Caio Henrique",
+    origin: PropertyOrigin.AIRBNB,
+    checkIn: "2026-04-23",
+    checkOut: "2026-04-27",
+    value: 11214.99,
+    commission: 0,
+    status: BookingStatus.CONCLUIDA,
+    notes: "Reserva de 4 noites. 9 hóspedes e 2 bebês."
+  },
+  {
+    id: "bk-512-3",
+    propertyId: "casa-512",
+    guestName: "Elza Falcao",
+    origin: PropertyOrigin.AIRBNB,
+    checkIn: "2026-05-01",
+    checkOut: "2026-05-03",
+    value: 5965.42,
+    commission: 0,
+    status: BookingStatus.CONCLUIDA,
+    notes: "Reserva de 2 noites. 8 hóspedes."
   }
 ];
 

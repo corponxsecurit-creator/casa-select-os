@@ -15,6 +15,7 @@
   --color-slate-400: #8da4c4;
   --color-slate-300: #c5d3e8;
   --color-slate-200: #e2e8f0;
+  --color-slate-100: #f1f5f9;
 
   --color-accent-purple: #c01e2e;
   --color-accent-purple-hover: #a81a28;
@@ -31,7 +32,7 @@ body {
 }
 
 #app-root-container {
-  background-image: url('./casa_select_bg.png') !important;
+  background-image: url('/assets/dashboard-bg.jpg') !important;
   background-size: cover !important;
   background-position: center !important;
   background-repeat: no-repeat !important;
@@ -44,8 +45,8 @@ body {
 }
 
 html.light #app-workspace {
-  background: rgba(250, 248, 245, 0.94) !important;
-  backdrop-filter: blur(16px) !important;
+  background: rgba(250, 248, 245, 0.15) !important;
+  backdrop-filter: blur(24px) !important;
 }
 
 .calendar-glass-container {
@@ -59,11 +60,11 @@ html.light #app-workspace {
 }
 
 html.light .calendar-glass-container {
-  background-image: linear-gradient(rgba(250, 248, 245, 0.88), rgba(250, 248, 245, 0.88)), url('./calendar_bg.png') !important;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.75)), url('./calendar_bg.png') !important;
   background-size: cover !important;
   background-position: center !important;
-  backdrop-filter: blur(12px) !important;
-  border: 1px solid rgba(184, 144, 71, 0.15) !important;
+  backdrop-filter: blur(24px) !important;
+  border: 1px solid rgba(184, 144, 71, 0.28) !important;
 }
 
 
@@ -122,39 +123,58 @@ html.light body {
 }
 
 html.light #app-root-container {
-  background:
-    radial-gradient(ellipse at 15% 50%, rgba(184, 144, 71, 0.04) 0%, transparent 55%),
-    radial-gradient(ellipse at 85% 30%, rgba(223, 178, 108, 0.06) 0%, transparent 50%),
-    #FAF8F5 !important;
+  background-image: 
+    linear-gradient(rgba(250, 248, 245, 0.15), rgba(250, 248, 245, 0.15)),
+    url('/assets/casa-select-garden.jpg') !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-attachment: fixed !important;
+}
+
+html.light .bg-slate-955:not(#sidebar-container):not(#sidebar-container *):not(.sidebar-keep) {
+  background-color: rgba(255, 255, 255, 0.72) !important;
+  backdrop-filter: blur(28px) !important;
+  border: 1px solid rgba(184, 144, 71, 0.28) !important;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.75), 0 8px 32px rgba(184, 144, 71, 0.08) !important;
 }
 
 html.light .bg-slate-950:not(#sidebar-container):not(#sidebar-container *):not(.sidebar-keep) {
-  background-color: #FFFFFF !important;
-  border: 1px solid #E8E3D9 !important;
+  background-color: rgba(255, 255, 255, 0.72) !important;
+  backdrop-filter: blur(28px) !important;
+  border: 1px solid rgba(184, 144, 71, 0.28) !important;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.75), 0 8px 32px rgba(184, 144, 71, 0.08) !important;
 }
 
 html.light .bg-slate-900:not(#sidebar-container):not(#sidebar-container *):not(.sidebar-keep) {
-  background-color: #FFFFFF !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02) !important;
-  border: 1px solid #E8E3D9 !important;
+  background-color: rgba(255, 255, 255, 0.68) !important;
+  backdrop-filter: blur(24px) !important;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.7), 0 8px 32px rgba(184, 144, 71, 0.06) !important;
+  border: 1px solid rgba(184, 144, 71, 0.25) !important;
 }
 
 html.light .bg-slate-850:not(#sidebar-container):not(#sidebar-container *):not(.sidebar-keep) {
-  background-color: #FAF8F5 !important;
-  border: 1px solid #E8E3D9 !important;
+  background-color: rgba(255, 255, 255, 0.65) !important;
+  backdrop-filter: blur(24px) !important;
+  border: 1px solid rgba(184, 144, 71, 0.22) !important;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.7), 0 8px 32px rgba(184, 144, 71, 0.06) !important;
 }
 
 html.light .bg-slate-800:not(#sidebar-container):not(#sidebar-container *):not(.sidebar-keep) {
-  background-color: #FFFFFF !important;
-  border: 1px solid #E8E3D9 !important;
+  background-color: rgba(255, 255, 255, 0.68) !important;
+  backdrop-filter: blur(24px) !important;
+  border: 1px solid rgba(184, 144, 71, 0.25) !important;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.7), 0 8px 32px rgba(184, 144, 71, 0.06) !important;
 }
 
 html.light .bg-slate-950\/50:not(#sidebar-container):not(#sidebar-container *):not(.sidebar-keep) {
-  background-color: rgba(250, 248, 245, 0.5) !important;
+  background-color: rgba(255, 255, 255, 0.45) !important;
+  backdrop-filter: blur(16px) !important;
 }
 
 html.light .bg-slate-950\/60:not(#sidebar-container):not(#sidebar-container *):not(.sidebar-keep) {
-  background-color: rgba(250, 248, 245, 0.6) !important;
+  background-color: rgba(255, 255, 255, 0.55) !important;
+  backdrop-filter: blur(16px) !important;
 }
 
 html.light .border-slate-950:not(#sidebar-container):not(#sidebar-container *):not(.sidebar-keep),
@@ -162,7 +182,7 @@ html.light .border-slate-900:not(#sidebar-container):not(#sidebar-container *):n
 html.light .border-slate-850:not(#sidebar-container):not(#sidebar-container *):not(.sidebar-keep),
 html.light .border-slate-800:not(#sidebar-container):not(#sidebar-container *):not(.sidebar-keep),
 html.light .border-slate-800\/60:not(#sidebar-container):not(#sidebar-container *):not(.sidebar-keep) {
-  border-color: #E8E3D9 !important;
+  border-color: rgba(184, 144, 71, 0.25) !important;
 }
 
 html.light #sidebar-container {
@@ -276,15 +296,16 @@ html.light #workspace-header {
 }
 
 html.light .premium-card {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.6)) !important;
-  backdrop-filter: blur(24px) !important;
-  border: 1px solid rgba(184, 144, 71, 0.12) !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.55)) !important;
+  backdrop-filter: blur(28px) !important;
+  border: 1px solid rgba(184, 144, 71, 0.28) !important;
   border-radius: 20px !important;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.75), 0 8px 32px rgba(184, 144, 71, 0.08) !important;
 }
 
 html.light .premium-card:hover {
-  box-shadow: 0 12px 48px rgba(184, 144, 71, 0.06) !important;
-  border-color: rgba(184, 144, 71, 0.3) !important;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.8), 0 12px 48px rgba(184, 144, 71, 0.12) !important;
+  border-color: rgba(184, 144, 71, 0.45) !important;
 }
 
 .glass-card {
@@ -295,10 +316,11 @@ html.light .premium-card:hover {
 }
 
 html.light .glass-card {
-  background: rgba(255, 255, 255, 0.75) !important;
-  backdrop-filter: blur(20px) !important;
-  border: 1px solid rgba(184, 144, 71, 0.15) !important;
+  background: rgba(255, 255, 255, 0.65) !important;
+  backdrop-filter: blur(24px) !important;
+  border: 1px solid rgba(184, 144, 71, 0.25) !important;
   border-radius: 20px !important;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.75), 0 8px 32px rgba(184, 144, 71, 0.06) !important;
 }
 
 .card-glow {
@@ -359,13 +381,15 @@ html.light .glass-card {
 }
 
 html.light .kpi-card {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.6)) !important;
-  border: 1px solid rgba(184, 144, 71, 0.12) !important;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.55)) !important;
+  backdrop-filter: blur(28px) !important;
+  border: 1px solid rgba(184, 144, 71, 0.28) !important;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.75), 0 8px 32px rgba(184, 144, 71, 0.06) !important;
 }
 
 html.light .kpi-card:hover {
-  box-shadow: 0 16px 48px rgba(184, 144, 71, 0.08) !important;
-  border-color: rgba(184, 144, 71, 0.35) !important;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.8), 0 16px 48px rgba(184, 144, 71, 0.12) !important;
+  border-color: rgba(184, 144, 71, 0.45) !important;
 }
 
 /* ════════════════════════════════════════════
@@ -487,3 +511,103 @@ html.light .custom-chart-tooltip {
 .status-agendado { background: rgba(59, 130, 246, 0.12); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.2); }
 .status-em-breve { background: rgba(245, 158, 11, 0.12); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.2); }
 .status-concluido { background: rgba(16, 185, 129, 0.12); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.2); }
+
+/* ════════════════════════════════════════════
+   RESPONSIVE PREMIUM MOBILE STYLES
+   ════════════════════════════════════════════ */
+
+/* Drawer Mobile Backdrop Blur */
+.drawer-backdrop {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(12px);
+  transition: opacity 0.3s ease-out;
+}
+
+/* Premium Drawer Container */
+.drawer-container {
+  max-width: 80%;
+  width: 320px;
+  background: linear-gradient(180deg, rgba(13, 22, 37, 0.92) 0%, rgba(8, 14, 24, 0.96) 100%) !important;
+  backdrop-filter: blur(28px) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 24px 0 80px rgba(0, 0, 0, 0.6) !important;
+  border-radius: 0 24px 24px 0;
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
+html.light .drawer-container {
+  background: linear-gradient(180deg, rgba(250, 248, 245, 0.92) 0%, rgba(255, 255, 255, 0.96) 100%) !important;
+  border-right: 1px solid rgba(184, 144, 71, 0.25) !important;
+  box-shadow: 24px 0 80px rgba(184, 144, 71, 0.1) !important;
+}
+
+/* Fluid KPI Card */
+.kpi-card-fluid {
+  width: 100%;
+  height: auto;
+  border-radius: 24px !important;
+  backdrop-filter: blur(20px) !important;
+  padding: 1rem !important;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+/* Photo Carousel and Swipe Gestures */
+.carousel-swipe-container {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.carousel-swipe-container::-webkit-scrollbar {
+  display: none;
+}
+
+.carousel-slide {
+  flex: 0 0 100%;
+  width: 100%;
+  scroll-snap-align: start;
+  position: relative;
+}
+
+/* Zoom/Pinch Container */
+.zoomable-image-container {
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.zoomable-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  transition: transform 0.2s ease-out;
+  transform-origin: center center;
+}
+
+/* Mobile Table Cards */
+.mobile-table-card {
+  background: rgba(13, 22, 37, 0.45) !important;
+  backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  border-radius: 20px !important;
+  padding: 1rem;
+  transition: all 0.2s ease;
+}
+
+html.light .mobile-table-card {
+  background: rgba(255, 255, 255, 0.65) !important;
+  border: 1px solid rgba(184, 144, 71, 0.22) !important;
+}
+
+.mobile-table-card:active {
+  transform: scale(0.98);
+}
+

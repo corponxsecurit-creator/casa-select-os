@@ -15,9 +15,10 @@ import {
   Boxes,
   ChevronDown,
   ChevronUp,
-  Headphones,
   Percent,
-  Smartphone
+  Smartphone,
+  PieChart,
+  X
 } from "lucide-react";
 
 interface SidebarProps {
@@ -76,12 +77,40 @@ export function KobayashiLogo({ darkMode, className = "w-10 h-10 shrink-0" }: { 
 
 export default function Sidebar({ activeTab, setActiveTab, onOpenMobilePWA, darkMode = true, isOpen = false, onClose }: SidebarProps) {
   const [financeOpen, setFinanceOpen] = React.useState(true);
+  const [isPWA, setIsPWA] = React.useState(false);
+
+  // Swipe gesture detection
+  const touchStartX = React.useRef(0);
+  const touchCurrentX = React.useRef(0);
+
+  React.useEffect(() => {
+    const checkPWA = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone === true;
+    setIsPWA(checkPWA);
+  }, []);
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchCurrentX.current = e.touches[0].clientX;
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    touchCurrentX.current = e.touches[0].clientX;
+  };
+
+  const onTouchEnd = () => {
+    const diffX = touchStartX.current - touchCurrentX.current;
+    // Swipe left to close menu
+    if (diffX > 50 && onClose) {
+      onClose();
+    }
+  };
 
   const mainNavItems = [
+    { id: "cockpit", label: "Visão Geral", icon: PieChart },
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "properties", label: "Propriedades", icon: Building2 },
     { id: "calendar", label: "Calendário", icon: Calendar },
-    { id: "pwa-sim", label: "Central Mobile (PWA)", icon: Smartphone },
+    ...(!isPWA ? [{ id: "pwa-sim", label: "Central Mobile (PWA)", icon: Smartphone }] : []),
   ];
 
   const financeSubItems = [
@@ -107,12 +136,15 @@ export default function Sidebar({ activeTab, setActiveTab, onOpenMobilePWA, dark
       <button
         key={item.id}
         id={`nav-item-${item.id}`}
-        onClick={() => setActiveTab(item.id)}
+        onClick={() => {
+          setActiveTab(item.id);
+          if (onClose) onClose();
+        }}
         className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all duration-200 text-[13px] font-medium cursor-pointer ${
           indented ? "ml-6 w-[calc(100%-1.5rem)]" : ""
         } ${
           isActive 
-            ? "bg-accent-purple/15 text-white font-semibold animate-pulse" 
+            ? "bg-accent-purple/15 text-white font-semibold" 
             : "text-slate-400 hover:text-slate-200"
         }`}
       >
@@ -131,20 +163,43 @@ export default function Sidebar({ activeTab, setActiveTab, onOpenMobilePWA, dark
 
   return (
     <>
+      {/* Drawer Overlay backdrop */}
       {isOpen && (
-        <div onClick={onClose} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-45 md:hidden transition-opacity duration-300" />
+        <div 
+          onClick={onClose} 
+          className="fixed inset-0 z-45 md:hidden drawer-backdrop"
+        />
       )}
       
       <aside 
         id="sidebar-container" 
-        className={`w-[260px] bg-slate-950 border-r border-slate-800 flex flex-col justify-between h-screen select-none transition-transform duration-300
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        className={`flex flex-col justify-between h-screen select-none transition-transform duration-300
           fixed md:sticky top-0 left-0 z-50 md:z-30 shrink-0
           ${isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
+          w-[280px] max-w-[80%] md:w-[260px] md:max-w-none
+          drawer-container md:drawer-container-none
         `}
+        style={{
+          borderRadius: isOpen ? "0 24px 24px 0" : "0",
+          backdropFilter: "blur(20px)"
+        }}
       >
-        <div className="p-6 pb-6 flex flex-col items-center text-center border-b border-slate-900/40 select-none">
+        <div className="p-6 pb-4 flex flex-col items-center text-center border-b border-slate-900/40 select-none relative">
+          {/* Close button for drawer on mobile */}
+          {isOpen && (
+            <button 
+              onClick={onClose} 
+              className="absolute top-4 right-4 p-1.5 rounded-full bg-slate-900/50 hover:bg-slate-800 text-slate-400 hover:text-white md:hidden cursor-pointer"
+            >
+              <X size={16} />
+            </button>
+          )}
+
           <div className="mb-4">
-            <KobayashiLogo darkMode={darkMode} className="w-20 h-20 shrink-0 filter drop-shadow-[0_4px_12px_rgba(223,178,108,0.2)]" />
+            <KobayashiLogo darkMode={darkMode} className="w-16 h-16 shrink-0 filter drop-shadow-[0_4px_12px_rgba(223,178,108,0.2)]" />
           </div>
           <h1 className="font-display font-extrabold text-base tracking-[0.15em] text-[#dfb26c] leading-none">
             CASA SELECT
@@ -180,7 +235,6 @@ export default function Sidebar({ activeTab, setActiveTab, onOpenMobilePWA, dark
 
           {bottomNavItems.map((item) => renderNavButton(item))}
         </div>
-
       </aside>
     </>
   );

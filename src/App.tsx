@@ -44,13 +44,14 @@ import { getProperties, getRevenues, getExpenses, getBookings, getAssets, getMai
 import Sidebar from "./components/Sidebar";
 import KPICards from "./components/KPICards";
 import PropertyDetails from "./components/PropertyDetails";
-import CommandCenter from "./components/CommandCenter";
 import OCRScanner from "./components/OCRScanner";
 import SenseiChat from "./components/SenseiChat";
-import ForecastView from "./components/ForecastView";
-import PWASimulator from "./components/PWASimulator";
-import IncomeTaxView from "./components/IncomeTaxView";
+const CommandCenter = React.lazy(() => import("./components/CommandCenter"));
+const ForecastView = React.lazy(() => import("./components/ForecastView"));
+const PWASimulator = React.lazy(() => import("./components/PWASimulator"));
+const IncomeTaxView = React.lazy(() => import("./components/IncomeTaxView"));
 import { LoginScreen } from "./components/LoginScreen";
+import { CEOCockpit } from "./components/CEOCockpit";
 import { 
   getAlerts,
   addProperty, addRevenue, addExpense, addBooking, addAsset, addMaintenance, deleteExpense,
@@ -108,6 +109,12 @@ export default function App() {
   const [selectedPropertyId, setSelectedPropertyId] = React.useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = React.useState<boolean>(false);
   const [currentUser, setCurrentUser] = React.useState<User | null>(null);
+
+  React.useEffect(() => {
+    if (currentUser?.role === 'admin') {
+      setActiveTab("cockpit");
+    }
+  }, [currentUser]);
   const [showPasswordChange, setShowPasswordChange] = React.useState(false);
   const [newPassword, setNewPassword] = React.useState("");
   const [passwordChangeMessage, setPasswordChangeMessage] = React.useState("");
@@ -127,13 +134,22 @@ export default function App() {
 
   React.useEffect(() => {
     if (darkMode) {
+      document.documentElement.classList.add("dark");
       document.documentElement.classList.remove("light");
       localStorage.setItem("theme", "dark");
     } else {
       document.documentElement.classList.add("light");
+      document.documentElement.classList.remove("dark");
       localStorage.setItem("theme", "light");
     }
   }, [darkMode]);
+
+  const [headerExpanded, setHeaderExpanded] = React.useState(false);
+  const [isPWA, setIsPWA] = React.useState(false);
+  React.useEffect(() => {
+    const checkPWA = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone === true;
+    setIsPWA(checkPWA);
+  }, []);
 
   const [currentClockTime, setCurrentClockTime] = React.useState<string>("");
 
@@ -321,16 +337,16 @@ export default function App() {
   const fireWebhook = async (payload: any) => {
     const timestamp = new Date().toLocaleTimeString("pt-BR");
     setWebhookLogs(prev => [
-      { time: timestamp, type: "request", message: `Enviando POST para ${webhookUrl}...` },
+      { time: timestamp, type: "request", message: `Enviando POST para ${webhookUrl} (via Proxy)...` },
       ...prev
     ]);
 
     try {
       const start = Date.now();
-      const response = await fetch(webhookUrl, {
+      const response = await fetch("/api/webhook/dispatch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ url: webhookUrl, payload })
       });
       const duration = Date.now() - start;
       
@@ -343,7 +359,7 @@ export default function App() {
 
       if (response.ok) {
         setWebhookLogs(prev => [
-          { time: timestamp, type: "success", message: `200 OK (${duration}ms): Notificação enviada com sucesso! Resposta: ${textRes.slice(0, 80)}` },
+          { time: timestamp, type: "success", message: `Sucesso (${duration}ms): Notificação enviada com sucesso! Resposta: ${textRes.slice(0, 80)}` },
           ...prev
         ]);
       } else {
@@ -359,10 +375,6 @@ export default function App() {
       ]);
     }
   };
-
-  if (!currentUser) {
-    return <LoginScreen onLogin={setCurrentUser} />;
-  }
 
   // Notifications bell panel open state
   const [notifOpen, setNotifOpen] = React.useState<boolean>(false);
@@ -397,10 +409,11 @@ export default function App() {
     name: "", type: "Outros", description: "", date: "", fileSize: "1.0 MB", fileUrl: ""
   });
 
-  // Fetch all database records from Express API
+  // Fetch all database records from Express API (with local fallback)
   const refreshDatabase = async () => {
     try {
       setLoading(true);
+      setErrorHeader(null);
       const [props, revs, exps, bks, asts, maintsList, alertsList, sups, docs] = await Promise.all([
         getProperties(), getRevenues(), getExpenses(), getBookings(), getAssets(), getMaintenances(), getAlerts(), getSuppliers(), getDocuments()
       ]);
@@ -423,8 +436,8 @@ export default function App() {
         setFormMaint(prev => ({ ...prev, propertyId: props[0].id }));
       }
     } catch (err: any) {
-      console.error(err);
-      setErrorHeader("Erro ao estabelecer conexão full-stack com a Central Casa Select.");
+      // Fallback data already handles missing API — just log silently
+      console.warn("[CasaSelect] API offline, using local data fallback.", err?.message);
     } finally {
       setLoading(false);
     }
@@ -876,6 +889,10 @@ export default function App() {
     { month: "Abr/26", receitas: 126540.89, despesas: 54720.49 }
   ];
 
+  if (!currentUser) {
+    return <LoginScreen onLogin={setCurrentUser} darkMode={darkMode} />;
+  }
+
   return (
     <div id="app-root-container" className="flex min-h-screen bg-[#FAFAFA] dark:bg-[#050B14] text-slate-900 dark:text-slate-100 overflow-x-hidden font-sans">
       
@@ -927,114 +944,197 @@ export default function App() {
         onClose={() => setIsSidebarOpen(false)}
       />
 
-      {/* Main Workspace Frame */}
       <main id="app-workspace" className="flex-1 min-w-0 flex flex-col h-screen overflow-y-auto bg-[#FAFAFA] dark:bg-[#050B14]">
-        
         {/* Top Premium Executive Header Bar */}
-        <header id="workspace-header" className="h-16 border-b border-slate-200 dark:border-slate-800 bg-[#FAFAFA] dark:bg-[#08111F] flex items-center justify-between px-6 shrink-0 sticky top-0 z-40 select-none">
-          <div className="flex items-center gap-3">
-            {/* Hamburger menu for mobile Drawer */}
-            <button 
-              onClick={() => setIsSidebarOpen(true)}
-              className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-250 dark:border-slate-800 text-slate-500 dark:text-slate-400 md:hidden cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-800 transition-all"
-            >
-              <Menu size={16} />
-            </button>
-            
-            <div className="flex flex-col">
-              <span className="font-sans font-extrabold text-xs md:text-sm text-slate-900 dark:text-white leading-tight">Bom dia, {currentUser.name} 👋</span>
-              <span className="text-[9px] md:text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-medium">Aqui está o resumo geral das suas propriedades</span>
+        <header id="workspace-header" className="h-16 border-b border-slate-200 dark:border-slate-800 bg-[#FAFAFA] dark:bg-[#08111F] px-4 md:px-6 shrink-0 sticky top-0 z-40 select-none">
+          {/* Desktop view header */}
+          <div className="hidden md:flex w-full h-full items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex flex-col">
+                <span className="font-sans font-extrabold text-sm text-slate-100 leading-tight">Bom dia, {currentUser.name} 👋</span>
+                <span className="text-[10px] text-slate-400 mt-0.5 font-medium">Aqui está o resumo geral das suas propriedades</span>
+              </div>
             </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => setShowPasswordChange(true)}
-              className="text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-emerald-500 transition-colors"
-            >
-              Trocar Senha
-            </button>
-            <button 
-              onClick={() => setCurrentUser(null)}
-              className="text-xs font-bold text-red-500/80 hover:text-red-500 transition-colors"
-            >
-              Sair
-            </button>
-          </div>
 
-          <div className="flex items-center gap-3.5 text-xs font-medium">
-            {/* Date period range - Pill shape with Calendar icon */}
-            <span className="font-sans text-[10px] font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 px-3 py-1.5 rounded-full flex items-center gap-1.5">
-              <CalendarIcon size={12} className="text-slate-400" />
-              Novembro 2025
-            </span>
+            <div className="flex items-center gap-3.5 text-xs font-medium">
+              <span className="font-sans text-[10px] font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                <CalendarIcon size={12} className="text-slate-400" />
+                Novembro 2025
+              </span>
 
-            {/* Command palette */}
-            <span className="text-[9px] font-mono text-slate-500 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-2 py-1 rounded-md hidden md:inline-flex items-center gap-1">
-              ⌘K
-            </span>
+              <span className="text-[9px] font-mono text-slate-500 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-2 py-1 rounded-md inline-flex items-center gap-1">
+                ⌘K
+              </span>
 
-            {/* Notification Bell with Dropdown */}
-            <div className="relative">
+              {/* Notification Bell with Dropdown */}
+              <div className="relative">
+                <button 
+                  id="btn-bell-notif"
+                  onClick={() => setNotifOpen(!notifOpen)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-350 dark:hover:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white transition-all cursor-pointer relative"
+                >
+                  <Bell size={14} />
+                  {alerts.length > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-[#b89047] text-white text-[8px] font-bold w-4 h-4 rounded-full flex items-center justify-center border border-white dark:border-slate-950 text-keep-white">
+                      {alerts.length}
+                    </span>
+                  )}
+                </button>
+
+                {notifOpen && (
+                  <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-[#0D1625] border border-slate-200 dark:border-slate-800/80 rounded-xl shadow-xl dark:shadow-black/50 z-50 p-3 space-y-2 select-text text-xs">
+                    <div className="flex justify-between items-center border-b border-slate-150 dark:border-slate-800 pb-2">
+                      <span className="font-semibold text-slate-900 dark:text-white">Alertas Operacionais ({alerts.length})</span>
+                      <button onClick={() => setNotifOpen(false)} className="text-[10px] text-slate-450 hover:text-slate-950 dark:hover:text-white cursor-pointer">Fechar</button>
+                    </div>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {alerts.map(a => (
+                        <div key={a.id} className="p-2 bg-slate-50 dark:bg-slate-950/60 rounded border border-slate-150 dark:border-slate-800">
+                          <strong className="block text-slate-800 dark:text-slate-200">{a.title}</strong>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">{a.message}</p>
+                        </div>
+                      ))}
+                      {alerts.length === 0 && (
+                        <p className="text-center text-[10px] text-slate-500 py-3">Sem alertas pendentes.</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Theme Toggle Button */}
               <button 
-                id="btn-bell-notif"
-                onClick={() => setNotifOpen(!notifOpen)}
-                className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-350 dark:hover:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white transition-all cursor-pointer relative"
+                id="btn-theme-toggle"
+                onClick={() => setDarkMode(!darkMode)}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-350 dark:hover:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white transition-all cursor-pointer"
+                title={darkMode ? "Ativar Modo Claro" : "Ativar Modo Escuro"}
               >
-                <Bell size={14} />
-                {alerts.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-[#b89047] text-white text-[8px] font-bold w-4 h-4 rounded-full flex items-center justify-center border border-white dark:border-slate-950 text-keep-white">
-                    {alerts.length}
-                  </span>
+                {darkMode ? (
+                  <Sun size={14} className="text-slate-500 dark:text-slate-400" />
+                ) : (
+                  <Moon size={14} className="text-slate-500 dark:text-slate-400" />
                 )}
               </button>
 
-              {notifOpen && (
-                <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-[#0D1625] border border-slate-200 dark:border-slate-800/80 rounded-xl shadow-xl dark:shadow-black/50 z-50 p-3 space-y-2 select-text text-xs">
-                  <div className="flex justify-between items-center border-b border-slate-150 dark:border-slate-800 pb-2">
-                    <span className="font-semibold text-slate-900 dark:text-white">Alertas Operacionais ({alerts.length})</span>
-                    <button onClick={() => setNotifOpen(false)} className="text-[10px] text-slate-450 hover:text-slate-950 dark:hover:text-white cursor-pointer">Fechar</button>
-                  </div>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {alerts.map(a => (
-                      <div key={a.id} className="p-2 bg-slate-50 dark:bg-slate-950/60 rounded border border-slate-150 dark:border-slate-800">
-                        <strong className="block text-slate-800 dark:text-slate-200">{a.title}</strong>
-                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">{a.message}</p>
-                      </div>
-                    ))}
-                    {alerts.length === 0 && (
-                      <p className="text-center text-[10px] text-slate-500 py-3">Sem alertas pendentes.</p>
-                    )}
-                  </div>
+              {/* User Profile Selector */}
+              <div className="flex items-center gap-2.5 border-l border-slate-200 dark:border-slate-800 pl-4 select-none">
+                <div className="w-8 h-8 rounded-full bg-[#b89047] text-white font-extrabold flex items-center justify-center text-xs border border-slate-200 dark:border-white/10 shadow-md text-keep-white">
+                  {companyName.split(" ").map(w => w[0] || "").join("").substring(0, 2).toUpperCase() || "CS"}
                 </div>
-              )}
+                <div>
+                  <span className="text-slate-900 dark:text-white block font-semibold text-xs leading-none">{companyName}</span>
+                  <span className="text-slate-500 dark:text-slate-455 text-[9px] block mt-0.5 tracking-wider uppercase font-mono font-bold">Administrador</span>
+                </div>
+                <button 
+                  onClick={() => setShowPasswordChange(true)}
+                  className="text-[10px] font-bold text-slate-500 hover:text-emerald-500 pl-2 cursor-pointer"
+                >
+                  Senha
+                </button>
+                <button 
+                  onClick={() => setCurrentUser(null)}
+                  className="text-[10px] font-bold text-red-500/80 hover:text-red-500 pl-2 cursor-pointer"
+                >
+                  Sair
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Mobile view header */}
+          <div className="flex md:hidden w-full h-full items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <button 
+                onClick={() => setIsSidebarOpen(true)}
+                className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 cursor-pointer"
+              >
+                <Menu size={18} />
+              </button>
+              {/* Expandable greeting trigger */}
+              <div 
+                onClick={() => setHeaderExpanded(!headerExpanded)}
+                className="flex items-center gap-1.5 cursor-pointer active:opacity-75"
+              >
+                <span className="font-display font-extrabold text-[14px] text-[#dfb26c] tracking-wide">Casa Select</span>
+                <span className="text-[10px] text-slate-500">▼</span>
+              </div>
             </div>
 
-            {/* Theme Toggle Button */}
-            <button 
-              id="btn-theme-toggle"
-              onClick={() => setDarkMode(!darkMode)}
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-350 dark:hover:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white transition-all cursor-pointer"
-              title={darkMode ? "Ativar Modo Claro" : "Ativar Modo Escuro"}
-            >
-              {darkMode ? (
-                <Sun size={14} className="text-slate-500 dark:text-slate-400" />
-              ) : (
-                <Moon size={14} className="text-slate-500 dark:text-slate-400" />
-              )}
-            </button>
+            <div className="flex items-center gap-2.5">
+              {/* Mobile Bell */}
+              <div className="relative">
+                <button 
+                  onClick={() => setNotifOpen(!notifOpen)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-450 relative"
+                >
+                  <Bell size={14} />
+                  {alerts.length > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-[#b89047] text-white text-[8px] font-bold w-4 h-4 rounded-full flex items-center justify-center border border-white dark:border-slate-950 text-keep-white">
+                      {alerts.length}
+                    </span>
+                  )}
+                </button>
 
-            {/* User Profile Selector */}
-            <div className="flex items-center gap-2.5 border-l border-slate-200 dark:border-slate-800 pl-4 select-none">
-              <div className="w-8 h-8 rounded-full bg-[#b89047] text-white font-extrabold flex items-center justify-center text-xs border border-slate-200 dark:border-white/10 shadow-md text-keep-white">
-                {companyName.split(" ").map(w => w[0] || "").join("").substring(0, 2).toUpperCase() || "CS"}
+                {notifOpen && (
+                  <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-[#0D1625] border border-slate-200 dark:border-slate-800/80 rounded-xl shadow-xl z-50 p-3 space-y-2 text-xs">
+                    <div className="flex justify-between items-center border-b border-slate-150 pb-1.5">
+                      <span className="font-semibold text-slate-900 dark:text-white">Alertas ({alerts.length})</span>
+                      <button onClick={() => setNotifOpen(false)} className="text-[9px] text-slate-500">Fechar</button>
+                    </div>
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                      {alerts.map(a => (
+                        <div key={a.id} className="p-1.5 bg-slate-50 dark:bg-slate-950/60 rounded border border-slate-150 dark:border-slate-850">
+                          <strong className="block text-[10px] text-slate-800 dark:text-slate-200">{a.title}</strong>
+                          <p className="text-[9px] text-slate-550 dark:text-slate-450 mt-0.5">{a.message}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="hidden md:block">
-                <span className="text-slate-900 dark:text-white block font-semibold text-xs leading-none">{companyName}</span>
-                <span className="text-slate-500 dark:text-slate-450 text-[9px] block mt-0.5 tracking-wider uppercase font-mono font-bold">Administrador</span>
+
+              {/* Mobile Theme Switcher */}
+              <button 
+                onClick={() => setDarkMode(!darkMode)}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-450"
+              >
+                {darkMode ? <Sun size={14} /> : <Moon size={14} />}
+              </button>
+
+              {/* User Avatar Circle */}
+              <div 
+                onClick={() => setHeaderExpanded(!headerExpanded)}
+                className="w-8 h-8 rounded-full bg-[#b89047] text-white font-extrabold flex items-center justify-center text-xs border border-slate-200 dark:border-white/10 shadow-md text-keep-white cursor-pointer"
+              >
+                {companyName.split(" ").map(w => w[0] || "").join("").substring(0, 2).toUpperCase() || "CS"}
               </div>
             </div>
           </div>
         </header>
+
+        {/* Mobile Expandable Header Panel */}
+        {headerExpanded && (
+          <div className="md:hidden bg-slate-100 dark:bg-slate-900/95 border-b border-slate-200 dark:border-slate-800 p-4 space-y-3.5 backdrop-blur-md z-35 animate-slideDown select-none">
+            <div className="flex flex-col">
+              <span className="font-sans font-extrabold text-sm text-slate-900 dark:text-slate-100 leading-tight">Bem-vindo, {currentUser.name} 👋</span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-450 mt-1 font-medium">Aqui está o resumo geral das suas propriedades.</span>
+            </div>
+            <div className="flex gap-2 pt-2 border-t border-slate-200 dark:border-slate-800/80">
+              <button 
+                onClick={() => { setShowPasswordChange(true); setHeaderExpanded(false); }} 
+                className="flex-1 bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-900 border border-slate-350 dark:border-slate-800 text-[10px] text-slate-800 dark:text-slate-300 py-1.5 rounded-lg font-bold cursor-pointer"
+              >
+                🔒 Trocar Senha
+              </button>
+              <button 
+                onClick={() => { setCurrentUser(null); setHeaderExpanded(false); }} 
+                className="flex-1 bg-red-500/10 hover:bg-red-500/25 border border-red-500/20 text-red-500 text-[10px] py-1.5 rounded-lg font-bold cursor-pointer"
+              >
+                🚪 Sair da Conta
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Global connection error advice */}
         {errorHeader && (
@@ -1070,6 +1170,12 @@ export default function App() {
           ) : (
             // Custom Active tab switch
             <>
+              {activeTab === "cockpit" && (
+                <div id="tab-cockpit">
+                  <CEOCockpit />
+                </div>
+              )}
+
               {activeTab === "dashboard" && (
                 <div id="tab-dashboard" className="space-y-6">
 
@@ -2305,7 +2411,7 @@ export default function App() {
                             <span>⚡</span> Testar Webhook
                           </button>
                           <button 
-                            onClick={() => { handleSendWhatsApp("5511999998888", "Mensagem de teste do sistema Kobayashi OS 2.0! Integração realizada com sucesso. 🏯✨"); }}
+                            onClick={() => { handleSendWhatsApp("5511953992662", "Mensagem de teste do sistema Kobayashi OS 2.0! Integração realizada com sucesso. 🏯✨"); }}
                             className="w-1/2 bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/20 text-emerald-400 rounded py-2 text-[10px] font-semibold cursor-pointer transition-all flex items-center justify-center gap-1.5"
                           >
                             <span>💬</span> Testar WhatsApp
@@ -2701,13 +2807,15 @@ export default function App() {
               )}
 
               {activeTab === "income-tax" && (
-                <IncomeTaxView
-                  properties={properties}
-                  revenues={revenues}
-                  expenses={expenses}
-                  onDataChanged={refreshDatabase}
-                  darkMode={darkMode}
-                />
+                <React.Suspense fallback={<div className="p-8 text-center text-slate-400 animate-pulse">Carregando impostos...</div>}>
+                  <IncomeTaxView
+                    properties={properties}
+                    revenues={revenues}
+                    expenses={expenses}
+                    onDataChanged={refreshDatabase}
+                    darkMode={darkMode}
+                  />
+                </React.Suspense>
               )}
 
               {activeTab === "ai-bot" && (
@@ -2718,21 +2826,28 @@ export default function App() {
 
               {activeTab === "forecast" && (
                 <div id="tab-forecast">
-                  <ForecastView />
+                  <React.Suspense fallback={<div className="p-8 text-center text-slate-400 animate-pulse">Carregando previsões...</div>}>
+                    <ForecastView />
+                  </React.Suspense>
                 </div>
               )}
 
               {activeTab === "pwa-sim" && (
                 <div id="tab-pwa-sim">
-                  <PWASimulator 
-                    properties={properties} 
-                    bookings={bookings} 
-                    expenses={expenses} 
-                    revenues={revenues}
-                    onDataChanged={refreshDatabase}
-                    onClose={() => setActiveTab("dashboard")}
-                    darkMode={darkMode}
-                  />
+                  <React.Suspense fallback={<div className="p-8 text-center text-slate-400 animate-pulse">Carregando simulador PWA...</div>}>
+                    <PWASimulator 
+                      properties={properties} 
+                      bookings={bookings} 
+                      expenses={expenses} 
+                      revenues={revenues}
+                      maintenances={maintenances}
+                      suppliers={suppliers}
+                      onDataChanged={refreshDatabase}
+                      onClose={() => setActiveTab("dashboard")}
+                      darkMode={darkMode}
+                      currentUser={currentUser}
+                    />
+                  </React.Suspense>
                 </div>
               )}
 
@@ -2941,6 +3056,52 @@ export default function App() {
                       </div>
                     </div>
                   </form>
+
+                  {/* Webhooks & WhatsApp logs console inside settings */}
+                  <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl max-w-4xl space-y-4 mt-6">
+                    <div className="flex items-center gap-2 pb-1.5 border-b border-slate-800">
+                      <Sliders className="text-accent-purple" size={14} />
+                      <h3 className="font-display font-bold text-xs uppercase tracking-wider text-slate-400">
+                        Central de Webhooks & WhatsApp Logs (Painel de Testes)
+                      </h3>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[9px] text-slate-500 uppercase block font-semibold">Log de Conexão em Tempo Real</label>
+                      <div className="w-full bg-black rounded-lg p-2.5 h-32 overflow-y-auto font-mono text-[9px] text-emerald-400 space-y-1.5 scrollbar-none border border-slate-850">
+                        {webhookLogs.map((log, lIdx) => {
+                          let typeColor = "text-slate-400";
+                          if (log.type === "success") typeColor = "text-emerald-400 font-bold";
+                          else if (log.type === "error") typeColor = "text-rose-450 font-bold";
+                          else if (log.type === "request") typeColor = "text-sky-400";
+
+                          return (
+                            <div key={lIdx} className="leading-normal">
+                              <span className="text-slate-600">[{log.time}]</span>{" "}
+                              <span className={typeColor}>{log.message}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button 
+                        type="button"
+                        onClick={() => { fireWebhook({ test: true, system: "Kobayashi OS", message: "Teste de comunicação bem-sucedido!" }); }}
+                        className="w-1/2 bg-slate-950 hover:bg-slate-900 border border-slate-850 hover:border-slate-750 text-white rounded py-2 text-[10px] font-semibold cursor-pointer transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <span>⚡</span> Testar Webhook
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => { handleSendWhatsApp("5511953992662", "Mensagem de teste do sistema Kobayashi OS 2.0! Integração realizada com sucesso. 🏯✨"); }}
+                        className="w-1/2 bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/20 text-emerald-400 rounded py-2 text-[10px] font-semibold cursor-pointer transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <span>💬</span> Testar WhatsApp
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </>

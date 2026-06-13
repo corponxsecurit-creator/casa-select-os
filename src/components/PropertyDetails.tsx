@@ -164,6 +164,195 @@ export default function PropertyDetails({
     return stream.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [propRevenues, propExpenses, propBookings, propMaintenances]);
 
+  // Fullscreen, pinch, zoom, swipe horizontal image gallery for properties
+  const PropertyImageCarousel = () => {
+    const images = React.useMemo(() => [
+      property.image || "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80",
+    ], [property.image]);
+
+    const [currentIndex, setCurrentIndex] = React.useState(0);
+    const [fullscreen, setFullscreen] = React.useState(false);
+    const [zoomScale, setZoomScale] = React.useState(1);
+
+    const touchStartX = React.useRef(0);
+    const touchCurrentX = React.useRef(0);
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+      touchStartX.current = e.touches[0].clientX;
+      touchCurrentX.current = e.touches[0].clientX;
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+      touchCurrentX.current = e.touches[0].clientX;
+    };
+
+    const handleTouchEnd = () => {
+      const diff = touchStartX.current - touchCurrentX.current;
+      if (Math.abs(diff) > 50) {
+        if (diff > 0 && currentIndex < images.length - 1) {
+          setCurrentIndex(prev => prev + 1);
+        } else if (diff < 0 && currentIndex > 0) {
+          setCurrentIndex(prev => prev - 1);
+        }
+      }
+    };
+
+    const handleNext = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (currentIndex < images.length - 1) {
+        setCurrentIndex(prev => prev + 1);
+      }
+    };
+
+    const handlePrev = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (currentIndex > 0) {
+        setCurrentIndex(prev => prev - 1);
+      }
+    };
+
+    const toggleFullscreen = (e?: React.MouseEvent) => {
+      e?.stopPropagation();
+      setFullscreen(!fullscreen);
+      setZoomScale(1);
+    };
+
+    return (
+      <>
+        <div 
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          className="lg:col-span-2 rounded-2xl overflow-hidden border border-slate-200/10 dark:border-slate-800 h-64 relative bg-slate-950 select-none group cursor-pointer"
+        >
+          <picture>
+            <img 
+              src={images[currentIndex]} 
+              alt={`${property.name} - slide ${currentIndex + 1}`}
+              referrerPolicy="no-referrer"
+              loading="lazy"
+              sizes="100vw"
+              className="w-full h-full object-cover transition-opacity duration-300"
+            />
+          </picture>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent pointer-events-none" />
+          
+          {/* Navigation Dots */}
+          <div className="absolute top-4 left-4 flex gap-1.5 bg-black/45 backdrop-blur-md px-2.5 py-1 rounded-full text-[10px] font-mono text-slate-300">
+            {currentIndex + 1} / {images.length}
+          </div>
+
+          {/* Fullscreen Trigger */}
+          <div className="absolute top-4 right-4 flex gap-2">
+            <button 
+              onClick={toggleFullscreen} 
+              className="p-1.5 rounded-xl bg-black/45 hover:bg-black/60 text-white backdrop-blur-md transition-all cursor-pointer border border-white/5"
+              title="Ver em tela cheia"
+            >
+              <svg xmlns="http://www.w3.org/2050/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 3 6 6-6 6-6-6 6-6z"/><path d="M9 21 3 15l6-6 6 6-6 6z"/></svg>
+            </button>
+          </div>
+
+          {/* Chevrons for Desktop Hover */}
+          {currentIndex > 0 && (
+            <button 
+              onClick={handlePrev}
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/55 text-white flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              ‹
+            </button>
+          )}
+          {currentIndex < images.length - 1 && (
+            <button 
+              onClick={handleNext}
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/55 text-white flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              ›
+            </button>
+          )}
+
+          <div className="absolute bottom-5 left-5 right-5 pointer-events-none">
+            <h4 className="font-display font-semibold text-lg text-white">Sobre a propriedade</h4>
+            <p className="text-slate-350 text-xs mt-1.5 leading-relaxed truncate max-w-xl">{property.description}</p>
+          </div>
+        </div>
+
+        {/* Fullscreen view modal */}
+        {fullscreen && (
+          <div className="fixed inset-0 z-50 bg-black flex flex-col justify-between p-4 select-none animate-fade-in">
+            <div className="flex justify-between items-center text-white z-10">
+              <div>
+                <h4 className="font-sans font-bold text-sm">{property.name}</h4>
+                <p className="text-[10px] text-slate-400 font-mono">Foto {currentIndex + 1} de {images.length}</p>
+              </div>
+              <button 
+                onClick={() => toggleFullscreen()}
+                className="p-2 w-9 h-9 rounded-full bg-slate-900 text-white hover:bg-slate-800 cursor-pointer flex items-center justify-center font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-1 w-full flex items-center justify-center relative overflow-hidden my-4">
+              <div 
+                className="zoomable-image-container w-full h-full"
+                onDoubleClick={() => setZoomScale(prev => prev === 1 ? 2 : 1)}
+              >
+                <img 
+                  src={images[currentIndex]} 
+                  alt={`${property.name} - slide ${currentIndex + 1}`}
+                  className="zoomable-image"
+                  style={{ transform: `scale(${zoomScale})` }}
+                />
+              </div>
+
+              {currentIndex > 0 && (
+                <button 
+                  onClick={(e) => { e.stopPropagation(); setCurrentIndex(prev => prev - 1); setZoomScale(1); }}
+                  className="absolute left-4 w-10 h-10 rounded-full bg-slate-900/80 text-white flex items-center justify-center cursor-pointer text-xl"
+                >
+                  ‹
+                </button>
+              )}
+              {currentIndex < images.length - 1 && (
+                <button 
+                  onClick={(e) => { e.stopPropagation(); setCurrentIndex(prev => prev + 1); setZoomScale(1); }}
+                  className="absolute right-4 w-10 h-10 rounded-full bg-slate-900/80 text-white flex items-center justify-center cursor-pointer text-xl"
+                >
+                  ›
+                </button>
+              )}
+            </div>
+
+            <div className="flex justify-between items-center bg-slate-950/80 p-3 rounded-2xl border border-slate-900/80 z-10">
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setZoomScale(prev => Math.max(1, prev - 0.25))}
+                  className="px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs cursor-pointer"
+                >
+                  - Zoom
+                </button>
+                <span className="text-white text-xs font-mono flex items-center px-1">{Math.round(zoomScale * 100)}%</span>
+                <button 
+                  onClick={() => setZoomScale(prev => Math.min(3, prev + 0.25))}
+                  className="px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs cursor-pointer"
+                >
+                  + Zoom
+                </button>
+              </div>
+
+              <div className="text-[10px] text-slate-400 font-mono">
+                Toque duplo para zoom rápido
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  };
+
   return (
     <div id={`details-${property.id}`} className="space-y-6">
       {/* Detail Header */}
@@ -226,20 +415,8 @@ export default function PropertyDetails({
 
       {/* Main Image Banner & Fast Specs Bar */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Aspect Image */}
-        <div className="lg:col-span-2 rounded-2xl overflow-hidden border border-slate-800 h-64 relative bg-slate-950">
-          <img 
-            src={property.image || "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80"} 
-            alt={property.name}
-            referrerPolicy="no-referrer"
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
-          <div className="absolute bottom-5 left-5 right-5">
-            <h4 className="font-display font-semibold text-lg text-white">Sobre a propriedade</h4>
-            <p className="text-slate-300 text-xs mt-1.5 leading-relaxed">{property.description}</p>
-          </div>
-        </div>
+        <PropertyImageCarousel />
+
 
         {/* Dynamic Micro Alertas & Calendars */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between">

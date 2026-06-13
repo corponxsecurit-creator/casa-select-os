@@ -15,6 +15,9 @@ export interface Property {
   image?: string;
   stars?: number;
   rooms?: number;
+  bathrooms?: number;
+  guests?: number;
+  pricePerNight?: number;
   sizeSqM?: number;
 }
 

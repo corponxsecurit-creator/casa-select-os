@@ -10,14 +10,6 @@ interface KPICardProps {
   icon: React.ElementType;
 }
 
-const iconMap = {
-  green: DollarSign,
-  red: TrendingDown,
-  orange: Wallet,
-  blue: Percent,
-  purple: BarChart3,
-};
-
 const colorMap = {
   green: {
     bg: "bg-emerald-500/10",
@@ -78,11 +70,12 @@ export default function KPICards({
   ocupacaoMedia?: number;
   roiMedio?: number;
 }) {
+  // Ordered by priority: Receita, Lucro, Ocupação, Despesas, ROI
   const cards: KPICardProps[] = [
     {
       title: "Receita Total",
       value: `R$ ${receitasTotais.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
-      diff: "+12,4%",
+      diff: "+12,5%",
       isPositive: true,
       color: "green",
       icon: DollarSign
@@ -96,20 +89,20 @@ export default function KPICards({
       icon: TrendingUp
     },
     {
-      title: "Custos Totais",
-      value: `R$ ${despesasTotais.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
-      diff: "-3,2%",
-      isPositive: false,
-      color: "orange",
-      icon: Wallet
-    },
-    {
       title: "Taxa de Ocupação",
       value: `${ocupacaoMedia.toFixed(1)}%`,
       diff: "+5,1%",
       isPositive: true,
       color: "blue",
       icon: Percent
+    },
+    {
+      title: "Custos Totais",
+      value: `R$ ${despesasTotais.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+      diff: "-3,2%",
+      isPositive: false,
+      color: "orange",
+      icon: Wallet
     },
     {
       title: "ROI Médio",
@@ -122,7 +115,7 @@ export default function KPICards({
   ];
 
   return (
-    <div id="kpi-cards-grid" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+    <div id="kpi-cards-grid" className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 md:gap-4 w-full">
       {cards.map((card, idx) => {
         const Icon = card.icon;
         const c = colorMap[card.color];
@@ -130,37 +123,32 @@ export default function KPICards({
         return (
           <div
             key={idx}
-            className="kpi-card rounded-2xl p-5"
+            className="kpi-card kpi-card-fluid flex flex-col justify-between h-auto min-h-[140px] border border-slate-200/10 dark:border-slate-800/80 bg-gradient-to-br from-slate-900/60 to-slate-950/40 dark:from-slate-950/60 dark:to-slate-950/90 shadow-xl"
+            style={{ borderRadius: "24px" }}
           >
-            <div className="flex items-start justify-between mb-4">
-              <span className="text-slate-400 text-[10px] font-semibold tracking-wider uppercase">
+            {/* Top: Title */}
+            <div>
+              <span className="text-slate-400 text-[10px] xs:text-xs font-bold tracking-wide uppercase block mb-1">
                 {card.title}
               </span>
-              <div className={`${c.bg} ${c.text} p-2 rounded-xl border ${c.border} flex items-center justify-center`}>
+              {/* Middle: Fluid Value */}
+              <h3 className="font-display font-black text-lg xs:text-xl sm:text-2xl text-white tracking-tight leading-none">
+                <KPIValue value={card.value} />
+              </h3>
+            </div>
+
+            {/* Bottom: Growth Indicator & Icon */}
+            <div className="flex items-end justify-between mt-3">
+              <div className="flex flex-col gap-0.5">
+                <div className={`flex items-center gap-1 text-[11px] font-extrabold ${card.isPositive ? c.text : "text-red-400"}`}>
+                  {card.isPositive ? "↑" : "↓"} {card.diff}
+                </div>
+                <span className="text-[8px] text-slate-500 font-medium">vs. mês anterior</span>
+              </div>
+              
+              <div className={`${c.bg} ${c.text} p-2 rounded-xl border ${c.border} flex items-center justify-center shrink-0`}>
                 <Icon size={14} strokeWidth={2.5} />
               </div>
-            </div>
-            <h3 className="font-display font-black text-2xl text-white tracking-tight leading-none mb-2">
-              <KPIValue value={card.value} />
-            </h3>
-            <div className="flex items-center gap-1.5">
-              <div className={`flex items-center gap-1 text-[11px] font-bold ${card.isPositive ? c.text : "text-red-400"}`}>
-                {card.isPositive ? (
-                  <TrendingUp size={11} strokeWidth={3} />
-                ) : (
-                  <TrendingDown size={11} strokeWidth={3} />
-                )}
-                <span>{card.diff}</span>
-              </div>
-              <span className="text-[9px] text-slate-600 font-medium">vs. mês anterior</span>
-            </div>
-            <div className={`mt-3 h-1 rounded-full ${c.bg} overflow-hidden`}>
-              <div
-                className={`h-full rounded-full ${c.bar} transition-all duration-1000 ease-out`}
-                style={{
-                  width: card.isPositive ? `${60 + Math.random() * 30}%` : `${30 + Math.random() * 20}%`,
-                }}
-              />
             </div>
           </div>
         );

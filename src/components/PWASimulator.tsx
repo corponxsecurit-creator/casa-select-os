@@ -1,4 +1,5 @@
 import React from "react";
+import { motion } from "motion/react";
 import { 
   Smartphone, 
   Wifi, 
@@ -38,9 +39,12 @@ import {
   LogOut,
   MapPin,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Camera
 } from "lucide-react";
-import { Property, Booking, Revenue, Expense } from "../types";
+import { Property, Booking, Revenue, Expense, ExpenseCategory, Maintenance, Supplier, MaintenanceStatus, MaintenanceType } from "../types";
+import type { User as AppUser } from "../types";
+import { scanReceiptOCR, addExpense } from "../data/api";
 import { KobayashiLogo } from "./Sidebar";
 
 interface PWASimulatorProps {
@@ -48,9 +52,13 @@ interface PWASimulatorProps {
   bookings: Booking[];
   expenses: Expense[];
   revenues: Revenue[];
+  maintenances: Maintenance[];
+  suppliers: Supplier[];
   onDataChanged: () => void;
   onClose: () => void;
   darkMode?: boolean;
+  onLogout?: () => void;
+  currentUser?: AppUser | null;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════ */
@@ -211,10 +219,12 @@ export default function PWASimulator({
   revenues,
   onDataChanged,
   onClose,
-  darkMode = true
+  darkMode = true,
+  onLogout,
+  currentUser
 }: PWASimulatorProps) {
-  const [mobileScreen, setMobileScreen] = React.useState<"login" | "dashboard">("login");
-  const [mobileTab, setMobileTab] = React.useState<"home" | "properties" | "finance" | "documents" | "profile">("home");
+  const [mobileScreen, setMobileScreen] = React.useState<"login" | "dashboard" | "ocr-scanner">("login");
+  const [mobileTab, setMobileTab] = React.useState<"ocr" | "calendar" | "properties">("ocr");
   const [showPassword, setShowPassword] = React.useState(false);
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -224,6 +234,269 @@ export default function PWASimulator({
   const [toastMessage, setToastMessage] = React.useState<string | null>(null);
   const [emailFocused, setEmailFocused] = React.useState(false);
   const [passwordFocused, setPasswordFocused] = React.useState(false);
+
+  const [deferredPrompt, setDeferredPrompt] = React.useState<any>(null);
+  const [isInstallable, setIsInstallable] = React.useState<boolean>(false);
+  const [isPWA, setIsPWA] = React.useState<boolean>(false);
+  const [ocrLoading, setOcrLoading] = React.useState<boolean>(false);
+  const [ocrError, setOcrError] = React.useState<string>("");
+  const [ocrSuccess, setOcrSuccess] = React.useState<boolean>(false);
+  const [extractedData, setExtractedData] = React.useState<{
+    value: number;
+    date: string;
+    supplier: string;
+    category: ExpenseCategory;
+    propertyId: string;
+    description: string;
+  } | null>(null);
+
+  // References for direct camera vs file picker upload triggers
+  const mobileCameraInputRef = React.useRef<HTMLInputElement>(null);
+  const mobileFileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Featured property ID state for properties screen (Screen 3)
+  const [featuredPropertyId, setFeaturedPropertyId] = React.useState<string>("casa-amado");
+
+  // Local state for calendar & reminders (Screen 2)
+  const [selectedDay, setSelectedDay] = React.useState<number>(11);
+  const [selectedMonth, setSelectedMonth] = React.useState<number>(6); // June
+  const [selectedYear, setSelectedYear] = React.useState<number>(2026);
+  const [reminders, setReminders] = React.useState<{
+    id: string;
+    title: string;
+    guestName: string;
+    phone: string;
+    time: string;
+    day: number;
+    month: number;
+    year: number;
+    description: string;
+  }[]>(() => {
+    const saved = localStorage.getItem("select_reminders");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return [];
+      }
+    }
+    return [
+      { id: "rem-1", title: "Inspeção Geral do Quadro", guestName: "Eletricista Roberto", phone: "+5511999998888", time: "10:00", day: 12, month: 6, year: 2026, description: "Fazer o teste de carga preventiva no quadro de luz." },
+      { id: "rem-2", title: "Dedetização Geral", guestName: "Dedetizadora Clean", phone: "+5511977776666", time: "14:30", day: 20, month: 6, year: 2026, description: "Serviço programado contra pragas." }
+    ];
+  });
+
+  const [webhookUrl, setWebhookUrl] = React.useState<string>(() => {
+    return localStorage.getItem("select_webhook_url") || "https://hook.us1.make.com/your-endpoint-here";
+  });
+
+  const [webhookLogs, setWebhookLogs] = React.useState<{ time: string; type: string; message: string; }[]>([]);
+
+  React.useEffect(() => {
+    localStorage.setItem("select_reminders", JSON.stringify(reminders));
+  }, [reminders]);
+
+  const fireWebhook = async (payload: any) => {
+    const timestamp = new Date().toLocaleTimeString("pt-BR");
+    setWebhookLogs(prev => [
+      { time: timestamp, type: "request", message: `Enviando POST para ${webhookUrl} (via Proxy)...` },
+      ...prev
+    ]);
+
+    try {
+      const start = Date.now();
+      const response = await fetch("/api/webhook/dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: webhookUrl, payload })
+      });
+      const duration = Date.now() - start;
+      
+      let textRes = "";
+      try {
+        textRes = await response.text();
+      } catch (e) {
+        textRes = "Vazio ou erro";
+      }
+
+      if (response.ok) {
+        setWebhookLogs(prev => [
+          { time: timestamp, type: "success", message: `Sucesso (${duration}ms): Notificação enviada! Resposta: ${textRes.slice(0, 80)}` },
+          ...prev
+        ]);
+        triggerToast("Webhook enviado com sucesso!");
+      } else {
+        setWebhookLogs(prev => [
+          { time: timestamp, type: "error", message: `Erro HTTP ${response.status} (${duration}ms): ${textRes.slice(0, 100)}` },
+          ...prev
+        ]);
+        triggerToast(`Erro HTTP ${response.status}`);
+      }
+    } catch (error: any) {
+      setWebhookLogs(prev => [
+        { time: timestamp, type: "error", message: `Erro: ${error?.message || error}` },
+        ...prev
+      ]);
+      triggerToast("Erro de Conexão no Webhook");
+    }
+  };
+
+  React.useEffect(() => {
+    const checkPWA = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone === true;
+    setIsPWA(checkPWA);
+  }, []);
+
+  const handleMobileOCRUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const base64 = event.target?.result as string;
+      await runMobileOCR(base64);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const runMobileOCR = async (base64Payload: string) => {
+    setOcrLoading(true);
+    setOcrError("");
+    setOcrSuccess(false);
+    setExtractedData(null);
+
+    try {
+      const data = await scanReceiptOCR(base64Payload);
+      
+      let categoryMatch = ExpenseCategory.OUTROS;
+      if (Object.values(ExpenseCategory).includes(data.category as ExpenseCategory)) {
+        categoryMatch = data.category as ExpenseCategory;
+      }
+
+      setExtractedData({
+        value: Number(data.value) || 0,
+        date: data.date || new Date().toISOString().split("T")[0],
+        supplier: data.supplier || "Diversos",
+        category: categoryMatch,
+        propertyId: data.propertyId || (properties[0]?.id || "casa-lilian"),
+        description: data.description || "Lançamento PWA com IA"
+      });
+    } catch (err: any) {
+      console.error(err);
+      setOcrError("Não foi possível decifrar o comprovante. Tente novamente ou use uma simulação.");
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
+  const handleMobileOCRSimulate = async (text: string) => {
+    setOcrLoading(true);
+    setOcrError("");
+    setOcrSuccess(false);
+    setExtractedData(null);
+
+    await new Promise(r => setTimeout(r, 1000));
+
+    let value = 450;
+    let supplier = "AcquaClean Pools";
+    let category = ExpenseCategory.PISCINA;
+    let propertyId = "casa-mayla";
+    let date = "2026-06-05";
+    let description = "Limpeza de Piscina";
+
+    if (text.includes("COELBA")) {
+      value = 6090.30;
+      supplier = "Coelba S/A";
+      category = ExpenseCategory.ENERGIA;
+      propertyId = "casa-nova";
+      date = "2026-05-28";
+      description = "Conta de luz - Alta temporada";
+    } else if (text.includes("ClimaMax")) {
+      value = 6571.50;
+      supplier = "ClimaMax Refrigeração";
+      category = ExpenseCategory.MANUTENCAO;
+      propertyId = "casa-lilian";
+      date = "2026-05-20";
+      description = "Instalação de ar condicionado inverter split";
+    }
+
+    setExtractedData({
+      value,
+      date,
+      supplier,
+      category,
+      propertyId,
+      description
+    });
+    setOcrLoading(false);
+  };
+
+  const handleMobileOCRConfirm = async () => {
+    if (!extractedData) return;
+
+    try {
+      setOcrLoading(true);
+      await addExpense({
+        propertyId: extractedData.propertyId,
+        category: extractedData.category,
+        supplier: extractedData.supplier,
+        date: extractedData.date,
+        value: extractedData.value,
+        paymentMethod: "Pix",
+        receipt: "Lançamento via PWA (Gemini OCR)"
+      });
+
+      setOcrSuccess(true);
+      setExtractedData(null);
+      
+      onDataChanged();
+
+      setTimeout(() => {
+        setOcrSuccess(false);
+        setMobileScreen("dashboard");
+      }, 1500);
+
+    } catch (err: any) {
+      console.error(err);
+      setOcrError("Erro ao salvar despesa no banco de dados.");
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
+  // Dynamically determine PWA download/redirect target. 
+  // If running locally, fallback to the stable production domain.
+  const getPWARedirectUrl = () => {
+    const origin = window.location.origin;
+    if (origin.includes("localhost") || origin.includes("127.0.0.1") || origin.includes("192.168.")) {
+      return "https://kobayashi-property-os-wordjoels-projects.vercel.app";
+    }
+    return origin;
+  };
+  const pwaUrl = getPWARedirectUrl();
+
+  React.useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsInstallable(true);
+    };
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log(`User response to install prompt: ${outcome}`);
+      setDeferredPrompt(null);
+      setIsInstallable(false);
+    } else {
+      alert("Para instalar o PWA, utilize o menu de opções do seu navegador (como 'Instalar aplicativo' ou 'Adicionar à tela de início').");
+    }
+  };
 
   // Financial aggregates
   const totalRevenues = React.useMemo(() => revenues.reduce((s, r) => s + r.value, 0), [revenues]);
@@ -284,8 +557,87 @@ export default function PWASimulator({
     pill: "rounded-full"
   };
 
+  const isDemoAdmin = currentUser?.role === "admin";
+
+  if (!isDemoAdmin) {
+    return (
+      <motion.div 
+        id="pwa-sim-wrapper" 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="space-y-6 select-none max-w-4xl mx-auto"
+      >
+        {/* Upper controls bar */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-5 border-b border-slate-200 dark:border-slate-800">
+          <div>
+            <div className="flex items-center gap-2 text-rose-600 dark:text-rose-500 mb-1">
+              <Smartphone size={14} />
+              <span className="font-mono text-[10px] uppercase tracking-widest font-bold">Instalação do Aplicativo</span>
+            </div>
+            <h2 className="font-display font-extrabold text-2xl text-slate-900 dark:text-white uppercase tracking-tight">Central Mobile (PWA)</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-xs font-medium">Instale o sistema Casa Select diretamente no seu smartphone ou tablet.</p>
+          </div>
+          <button onClick={onClose} className="border border-slate-350 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-850 text-slate-800 dark:text-white rounded-xl px-4 py-2 text-xs font-semibold cursor-pointer transition-all">
+            Voltar ao Comando
+          </button>
+        </div>
+
+        {/* PWA Installation/Download Card or Success Card */}
+        {isPWA ? (
+          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-3xl p-8 space-y-4 shadow-xl text-center">
+            <div className="w-16 h-16 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <h3 className="font-display font-extrabold text-lg text-white">Casa Select Instalado</h3>
+            <p className="text-slate-400 text-xs max-w-md mx-auto leading-relaxed">
+              Você já está navegando no aplicativo PWA oficial. Aproveite os atalhos nativos, inicialização rápida e experiência em tela cheia sem distrações.
+            </p>
+          </div>
+        ) : (
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 space-y-6 shadow-2xl relative overflow-hidden">
+            {/* Decorative background glow */}
+            <div className="absolute top-0 right-0 w-80 h-80 bg-[#dfb26c]/5 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-rose-500/10 rounded-2xl text-rose-500 shrink-0">
+                <Smartphone size={28} />
+              </div>
+              <div>
+                <h3 className="font-display font-extrabold text-lg text-white uppercase tracking-wider">Instalar Aplicativo Oficial (PWA)</h3>
+                <p className="text-slate-400 text-xs font-medium">Acesse a Casa Select de forma rápida, offline e com atalho direto na tela de início do seu dispositivo.</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-950/60 p-6 rounded-2xl border border-slate-800/80 space-y-4">
+                <button
+                  onClick={handleInstallClick}
+                  className="w-full flex items-center justify-center gap-2.5 bg-[#dfb26c] hover:bg-[#c99f5d] text-slate-950 font-extrabold text-sm py-3.5 px-6 rounded-xl cursor-pointer transition-all shadow-lg shadow-[#dfb26c]/10 hover:scale-[1.01]"
+                >
+                  <Smartphone size={16} strokeWidth={2.5} />
+                  Baixar e Instalar PWA
+                </button>
+
+                <div className="border-t border-slate-800/85 pt-4 space-y-2 text-xs text-slate-400">
+                  <span className="font-bold text-slate-300 block uppercase tracking-wider text-[10px]">Como instalar no Celular:</span>
+                  <p className="leading-relaxed"><strong className="text-slate-300">iOS (Safari):</strong> Toque em Compartilhar <span className="inline-block border border-slate-700 px-1.5 py-0.5 rounded bg-slate-800 text-[10px]">⎙</span> e selecione <strong>Adicionar à Tela de Início</strong>.</p>
+                  <p className="leading-relaxed"><strong className="text-slate-300">Android (Chrome):</strong> Toque nos três pontos no canto superior e selecione <strong>Instalar aplicativo</strong>.</p>
+                </div>
+            </div>
+          </div>
+        )}
+      </motion.div>
+    );
+  }
+
   return (
-    <div id="pwa-sim-wrapper" className="space-y-6 select-none">
+    <motion.div 
+      id="pwa-sim-wrapper" 
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="space-y-6 select-none"
+    >
       {/* Upper controls bar */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-5 border-b border-slate-200 dark:border-slate-800">
         <div>
@@ -519,7 +871,6 @@ export default function PWASimulator({
                           borderColor: c.border 
                         }}
                       >
-                        {/* ripple pulses */}
                         <div className="absolute inset-0 rounded-full bg-rose-500/20 animate-ping" style={{ animationDuration: "3s" }} />
                         <div className="absolute inset-0 rounded-full bg-rose-500/10 animate-ping" style={{ animationDuration: "3s", animationDelay: "1s" }} />
                         <Fingerprint size={24} strokeWidth={1.6} style={{ color: c.accent }} className="transition-transform group-hover:scale-110" />
@@ -534,429 +885,509 @@ export default function PWASimulator({
                   </div>
                 )}
 
-                {/* ═══════════════════════════════════════ */}
-                {/*  DASHBOARD SCREEN (Notion & Stripe UX) */}
-                {/* ═══════════════════════════════════════ */}
                 {mobileScreen === "dashboard" && (
-                  <div className="space-y-5 py-1 select-none">
+                  <div className="space-y-5 py-1 select-none flex-1 flex flex-col">
                     
                     {/* Header: Greeting & Profile */}
-                    {mobileTab === "home" && (
-                      <div className="flex items-center justify-between pb-2 border-b" style={{ borderColor: c.border }}>
-                        <div className="flex items-center gap-2.5">
-                          {/* Avatar Circle */}
-                          <div className="w-8 h-8 rounded-full text-white font-extrabold flex items-center justify-center text-xs shadow-md shrink-0 text-keep-white"
-                            style={{ backgroundColor: c.accent }}
-                          >
-                            HK
-                          </div>
-                          <div>
-                            <span className="text-[10px] font-bold block" style={{ color: c.textMuted }}>Olá, Administrador</span>
-                            <span className="text-xs font-black block tracking-tight" style={{ color: c.text }}>Dashboard</span>
-                          </div>
+                    <div className="flex items-center justify-between pb-2 border-b animate-fadeIn" style={{ borderColor: c.border }}>
+                      <div className="flex items-center gap-2.5">
+                        {/* Avatar Circle */}
+                        <div className="w-8 h-8 rounded-full text-white font-extrabold flex items-center justify-center text-xs shadow-md shrink-0 text-keep-white"
+                          style={{ backgroundColor: c.accent }}
+                        >
+                          HK
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-bold block" style={{ color: c.textMuted }}>Olá, Administrador</span>
+                          <span className="text-xs font-black block tracking-tight transition-all" style={{ color: c.text }}>
+                            {mobileTab === "ocr" && "OCR Financeiro"}
+                            {mobileTab === "calendar" && "Calendário & Agenda"}
+                            {mobileTab === "properties" && "Portfólio de Imóveis"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Top header stats */}
+                      <span className="text-[10px] font-mono text-[#dfb26c] bg-slate-950/40 border border-slate-800 px-2.5 py-1 rounded font-bold">
+                        Novembro 2025
+                      </span>
+                    </div>
+
+                    {/* 📱 SCREEN 1: OCR FINANCEIRO INTELIGENTE */}
+                    {mobileTab === "ocr" && (
+                      <div className="space-y-4 animate-fadeIn flex-1 flex flex-col pb-4">
+                        <div className="text-center space-y-1">
+                          <h4 className="font-display font-extrabold text-xs text-slate-300 uppercase tracking-wider">Leitor OCR Financeiro</h4>
+                          <p className="text-[9px] text-slate-500">Suba comprovantes para extração automática via Inteligência Artificial.</p>
                         </div>
 
-                        {/* Search and Alert header Actions */}
-                        <div className="flex items-center gap-2">
-                          <button onClick={() => triggerToast("Central de busca ativada")} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 transition-all cursor-pointer">
-                            <Search size={15} style={{ color: c.textMuted }} />
-                          </button>
-                          <div className="relative">
-                            <button onClick={() => triggerToast("Você possui 3 alertas operacionais")} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 transition-all cursor-pointer">
-                              <Bell size={15} style={{ color: c.textMuted }} />
-                              <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-rose-600" />
-                            </button>
+                        {ocrError && (
+                          <div className="p-2.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl flex items-start gap-2">
+                            <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                            <span className="text-[9.5px] leading-snug">{ocrError}</span>
                           </div>
-                        </div>
+                        )}
+
+                        {ocrSuccess && (
+                          <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-center space-y-2 animate-scaleUp">
+                            <CheckCircle2 size={24} className="text-emerald-500 mx-auto animate-pulse" />
+                            <h5 className="text-[11px] font-bold text-white uppercase">Lançamento Efetivado!</h5>
+                            <p className="text-[9px] text-slate-500">Os dados foram integrados no caixa da propriedade.</p>
+                          </div>
+                        )}
+
+                        {ocrLoading && (
+                          <div className="flex flex-col items-center justify-center py-10 space-y-3 text-center flex-1">
+                            <div className="w-8 h-8 border-3 border-[#dfb26c]/30 border-t-[#dfb26c] rounded-full animate-spin" />
+                            <div>
+                              <h5 className="font-bold text-slate-200 text-xs">Análise Select AI...</h5>
+                              <p className="text-[9px] text-slate-500 mt-1">Extraindo metadados fiscais da imagem/PDF...</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Dashed upload zone (instant camera trigger) */}
+                        {!ocrLoading && !extractedData && !ocrSuccess && (
+                          <div 
+                            onClick={() => mobileCameraInputRef.current?.click()}
+                            className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-2xl cursor-pointer bg-slate-900/30 text-center gap-2.5 transition-all hover:bg-slate-900/50 animate-fadeIn h-40 border-slate-700/80 active:scale-[0.98]"
+                          >
+                            <Camera size={32} className="text-[#dfb26c] animate-pulse" />
+                            <span className="text-[11px] font-bold text-slate-200">Tirar Foto (Câmera Mobile)</span>
+                            <span className="text-[9px] text-slate-500">Toque aqui para acionar a câmera nativa</span>
+                            
+                            {/* Hidden direct camera input */}
+                            <input 
+                              type="file" 
+                              ref={mobileCameraInputRef}
+                              accept="image/*" 
+                              capture="environment"
+                              onChange={handleMobileOCRUpload} 
+                              className="hidden" 
+                            />
+                          </div>
+                        )}
+
+                        {/* File selector fallback trigger */}
+                        {!ocrLoading && !extractedData && !ocrSuccess && (
+                          <div className="text-center">
+                            <button
+                              type="button"
+                              onClick={() => mobileFileInputRef.current?.click()}
+                              className="text-[10px] text-slate-400 hover:text-white underline font-semibold transition-all cursor-pointer"
+                            >
+                              Ou selecione um arquivo (PDF ou imagem) do dispositivo
+                            </button>
+                            <input 
+                              type="file" 
+                              ref={mobileFileInputRef}
+                              accept="image/*,application/pdf" 
+                              onChange={handleMobileOCRUpload} 
+                              className="hidden" 
+                            />
+                          </div>
+                        )}
+
+                        {/* Recurrent Simulation templates (Conta de Luz, Instalação de Ar, Piscineiro) */}
+                        {!ocrLoading && !extractedData && !ocrSuccess && (
+                          <div className="space-y-2">
+                            <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider block">Atalhos de Simulação:</span>
+                            <div className="grid grid-cols-3 gap-2">
+                              {[
+                                { name: "Conta de Luz", text: "COMPANHIA DE ELETRICIDADE DO ESTADO DA BAHIA - COELBA. FATURA DE ENERGIA ACUMULADA MÊS DE MAIO 2026. Lançamento Casa Nova. Total a pagar: R$ 6.090,30. Vencimento: 28/05/2026.", color: "border-amber-500/20 text-amber-400" },
+                                { name: "Instalação de Ar", text: "ClimaMax Refrigeração Comercial LTDA. NOTA FISCAL SERVIÇOS NF-e #8092. Tomador: Casa Lilian. Descrição: Instalação de Multi-Split 24K BTU Inverter com carga de gás. Valor Total: R$ 6.571,50.", color: "border-emerald-500/20 text-emerald-400" },
+                                { name: "Piscineiro", text: "AcquaClean Pools Tratamentos e Serviços de Lazer. Recibo de quitamento de serviços na piscina da Casa Mayla. Valor total cobrado: R$ 450,00. Pago via Pix em 05/06/2026.", color: "border-sky-500/20 text-sky-400" }
+                              ].map((t, i) => (
+                                <button
+                                  key={i}
+                                  type="button"
+                                  onClick={() => handleMobileOCRSimulate(t.text)}
+                                  className={`p-2.5 bg-slate-950/50 border hover:bg-slate-900 rounded-xl text-[9px] text-center font-bold transition-all flex flex-col items-center justify-center gap-1.5 cursor-pointer h-16 ${t.color}`}
+                                >
+                                  <span>{t.name}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* OCR Metadata Extraction Form */}
+                        {extractedData && !ocrLoading && !ocrSuccess && (
+                          <div className="space-y-3 bg-slate-950/60 p-3 rounded-xl border border-slate-850 animate-fadeIn">
+                            <span className="text-[9px] uppercase font-black tracking-wider text-accent-cyan block border-b border-slate-800 pb-1">Conferência dos Metadados</span>
+                            
+                            <div className="grid grid-cols-2 gap-2 text-[10px]">
+                              <div className="col-span-2">
+                                <label className="text-[8px] text-slate-500 font-bold block mb-0.5">FORNECEDOR</label>
+                                <input 
+                                  type="text" 
+                                  value={extractedData.supplier}
+                                  onChange={e => setExtractedData({ ...extractedData, supplier: e.target.value })}
+                                  className="w-full bg-slate-900 border border-slate-800 p-1.5 rounded text-white"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[8px] text-slate-500 font-bold block mb-0.5">VALOR (R$)</label>
+                                <input 
+                                  type="number" 
+                                  value={extractedData.value}
+                                  onChange={e => setExtractedData({ ...extractedData, value: Number(e.target.value) })}
+                                  className="w-full bg-slate-900 border border-slate-800 p-1.5 rounded text-white font-mono"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[8px] text-slate-500 font-bold block mb-0.5">DATA EMISSÃO</label>
+                                <input 
+                                  type="date" 
+                                  value={extractedData.date}
+                                  onChange={e => setExtractedData({ ...extractedData, date: e.target.value })}
+                                  className="w-full bg-slate-900 border border-slate-800 p-1.5 rounded text-white font-mono"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[8px] text-slate-500 font-bold block mb-0.5">IMÓVEL DESTINO</label>
+                                <select 
+                                  value={extractedData.propertyId}
+                                  onChange={e => setExtractedData({ ...extractedData, propertyId: e.target.value })}
+                                  className="w-full bg-slate-900 border border-slate-800 p-1.5 rounded text-white text-[9px]"
+                                >
+                                  {properties.map(p => (
+                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="text-[8px] text-slate-500 font-bold block mb-0.5">CATEGORIA CONTÁBIL</label>
+                                <select 
+                                  value={extractedData.category}
+                                  onChange={e => setExtractedData({ ...extractedData, category: e.target.value as any })}
+                                  className="w-full bg-slate-900 border border-slate-800 p-1.5 rounded text-white text-[9px]"
+                                >
+                                  {Object.values(ExpenseCategory).map(cat => (
+                                    <option key={cat} value={cat}>{cat}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="col-span-2">
+                                <label className="text-[8px] text-slate-500 font-bold block mb-0.5">DESCRIÇÃO DA DESPESA</label>
+                                <input 
+                                  type="text" 
+                                  value={extractedData.description}
+                                  onChange={e => setExtractedData({ ...extractedData, description: e.target.value })}
+                                  className="w-full bg-slate-900 border border-slate-800 p-1.5 rounded text-white"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="flex gap-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={() => setExtractedData(null)}
+                                className="w-1/3 border border-slate-800 text-slate-400 hover:text-white rounded-lg py-1.5 text-[10px] font-semibold cursor-pointer"
+                              >
+                                Descartar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleMobileOCRConfirm}
+                                className="w-2/3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg py-1.5 text-[10px] font-bold cursor-pointer"
+                              >
+                                Confirmar Lançamento
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Seção Administrador para conferência */}
+                        {!ocrLoading && !ocrSuccess && (
+                          <div className="mt-auto bg-slate-950/60 p-3 rounded-xl border border-slate-850 flex items-center justify-between text-xs animate-fadeIn">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-full bg-[#dfb26c] text-slate-950 font-extrabold flex items-center justify-center text-[10px]">AD</div>
+                              <div>
+                                <strong className="block text-[10px] text-slate-200">Painel Administrador</strong>
+                                <span className="text-[8px] text-slate-500 block">Conectado ao central Supabase / Vercel</span>
+                              </div>
+                            </div>
+                            <span className="w-5 h-5 rounded-full bg-[#dfb26c] text-slate-950 font-bold flex items-center justify-center text-[9px]">
+                              3
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )}
 
-                    {/* ═══ TAB: HOME ═══ */}
-                    {mobileTab === "home" && (
-                      <div className="space-y-5 animate-fadeIn">
+                    {/* 📅 SCREEN 2: CALENDÁRIO & AGENDA */}
+                    {mobileTab === "calendar" && (
+                      <div className="space-y-4 animate-fadeIn flex-1 overflow-y-auto pb-4 scrollbar-none text-xs">
                         
-                        {/* Hero Area: Strategic Highlights */}
-                        <div className={`p-4 ${rounded.card} border relative overflow-hidden flex flex-col justify-between`}
-                          style={{ 
-                            backgroundColor: c.card, 
-                            borderColor: c.border,
-                            boxShadow: isDark ? "0 4px 20px rgba(0,0,0,0.5)" : "0 4px 15px rgba(0,0,0,0.03)"
-                          }}
-                        >
-                          <div className="absolute right-0 top-0 w-24 h-24 rounded-full blur-xl opacity-30 pointer-events-none" 
-                            style={{ background: `radial-gradient(circle, ${c.accent} 0%, transparent 70%)` }}
-                          />
-                          <div className="space-y-0.5">
-                            <span className="text-[9px] uppercase font-bold tracking-wider" style={{ color: c.textMuted }}>Patrimônio Geral Sob Gestão</span>
-                            <div className="flex items-baseline gap-1">
-                              <span className="text-[20px] font-black tracking-tight" style={{ color: c.text }}>R$ 4.250.000,00</span>
-                              <span className="text-[9px] font-bold text-emerald-500 font-mono">100% Ativo</span>
-                            </div>
+                        {/* Month Visual Grid header */}
+                        <div className="p-3 bg-slate-950/50 border border-slate-850 rounded-xl space-y-3">
+                          <div className="flex justify-between items-center text-[10px] uppercase font-bold text-slate-400">
+                            <span>Junho de 2026</span>
+                            <span className="text-[8px] text-accent-cyan bg-accent-cyan/10 px-2 py-0.5 rounded border border-accent-cyan/20">Cronograma</span>
                           </div>
 
-                          <div className="grid grid-cols-3 gap-3 pt-3.5 mt-3 border-t font-mono text-[10px]" style={{ borderColor: c.border }}>
-                            <div>
-                              <span className="text-[8px] font-sans font-bold uppercase tracking-wider block" style={{ color: c.textMuted }}>Receitas</span>
-                              <strong className="text-emerald-500 block font-black mt-0.5">R$ {totalRevenues.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}</strong>
-                            </div>
-                            <div>
-                              <span className="text-[8px] font-sans font-bold uppercase tracking-wider block" style={{ color: c.textMuted }}>Ocupação</span>
-                              <strong className="text-sky-500 dark:text-sky-400 block font-black mt-0.5">{averageOccupancy}%</strong>
-                            </div>
-                            <div>
-                              <span className="text-[8px] font-sans font-bold uppercase tracking-wider block" style={{ color: c.textMuted }}>ROI Médio</span>
-                              <strong className="text-purple-500 block font-black mt-0.5">{averageRoi}%</strong>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* IA INSIGHTS Section (Linear/Stripe UX) */}
-                        <div className="space-y-2.5">
-                          <div className="flex items-center gap-1.5 pl-1">
-                            <Sparkles size={13} style={{ color: c.warning }} className="animate-pulse" />
-                            <h4 className="text-[11px] font-bold uppercase tracking-wider" style={{ color: c.textMuted }}>Insights Select AI</h4>
+                          <div className="grid grid-cols-7 gap-1 text-center text-[8px] font-mono font-bold text-slate-500">
+                            <div>DOM</div><div>SEG</div><div>TER</div><div>QUA</div><div>QUI</div><div>SEX</div><div>SÁB</div>
                           </div>
 
-                          <div className="flex gap-3 overflow-x-auto pb-1.5 scrollbar-none snap-x">
-                            {[
-                              { label: "Potencial de Reajuste", desc: "3 imóveis estão com aluguel abaixo da média da região.", color: c.warning, icon: TrendingUp },
-                              { label: "Vencimentos em 15d", desc: "2 contratos de locação precisam de renovação imediata.", color: c.accent, icon: Calendar },
-                              { label: "Ocupação Elevada", desc: "A taxa de ocupação subiu 8% no período atual.", color: c.success, icon: CheckCircle2 },
-                              { label: "Projeção Financeira", desc: "Previsão de crescimento de 12% para o próximo mês.", color: c.purple, icon: TrendingUp }
-                            ].map((item, idx) => {
-                              const Icon = item.icon;
+                          {/* Days Grid */}
+                          <div className="grid grid-cols-7 gap-1.5">
+                            {Array.from({ length: 30 }).map((_, idx) => {
+                              const dayNum = idx + 1;
+                              const dayStr = dayNum < 10 ? `0${dayNum}` : `${dayNum}`;
+                              const dateStr = `2026-06-${dayStr}`;
+
+                              // Check bookings
+                              const checkInsToday = bookings.filter(b => b.checkIn === dateStr);
+                              const checkOutsToday = bookings.filter(b => b.checkOut === dateStr);
+                              const activeBookings = bookings.filter(b => b.checkIn <= dateStr && dateStr <= b.checkOut && b.checkIn !== dateStr && b.checkOut !== dateStr);
+                              const dayReminders = reminders.filter(r => r.day === dayNum && r.month === 6 && r.year === 2026);
+
+                              const isSelected = selectedDay === dayNum;
+
+                              let bgClass = "bg-slate-900/50 text-slate-500 border-transparent";
+                              let borderClass = "border";
+
+                              if (isSelected) {
+                                bgClass = "bg-[#dfb26c]/20 text-white font-bold";
+                                borderClass = "border-[#dfb26c]";
+                              } else if (checkInsToday.length > 0) {
+                                bgClass = "bg-emerald-500/15 text-emerald-400";
+                                borderClass = "border-emerald-500/35";
+                              } else if (checkOutsToday.length > 0) {
+                                bgClass = "bg-rose-500/15 text-rose-400";
+                                borderClass = "border-rose-500/35";
+                              } else if (activeBookings.length > 0) {
+                                bgClass = "bg-sky-500/5 text-sky-300";
+                                borderClass = "border-sky-500/15";
+                              }
+
                               return (
-                                <div key={idx} 
-                                  onClick={() => triggerToast(`Insight: ${item.label}`)}
-                                  className={`w-[190px] shrink-0 p-3.5 border ${rounded.card} snap-start flex flex-col justify-between cursor-pointer`}
-                                  style={{ backgroundColor: c.card, borderColor: c.border }}
+                                <div
+                                  key={idx}
+                                  onClick={() => setSelectedDay(dayNum)}
+                                  className={`h-9 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-all ${bgClass} ${borderClass} relative`}
                                 >
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0" style={{ backgroundColor: `${item.color}15` }}>
-                                      <Icon size={11} style={{ color: item.color }} />
-                                    </div>
-                                    <span className="text-[10px] font-bold truncate" style={{ color: c.text }}>{item.label}</span>
+                                  <span className="text-[10px] font-mono leading-none">{dayNum}</span>
+                                  {/* Dots indicator */}
+                                  <div className="flex gap-0.5 mt-0.5 justify-center h-1">
+                                    {checkInsToday.length > 0 && <span className="w-1 h-1 rounded-full bg-emerald-500" />}
+                                    {checkOutsToday.length > 0 && <span className="w-1 h-1 rounded-full bg-rose-500" />}
+                                    {dayReminders.length > 0 && <span className="w-1 h-1 rounded-full bg-amber-500" />}
                                   </div>
-                                  <p className="text-[9.5px] mt-2 leading-snug" style={{ color: c.textMuted }}>{item.desc}</p>
                                 </div>
                               );
                             })}
                           </div>
                         </div>
 
-                        {/* Organized Dashboard Blocks */}
-                        <div className="space-y-3">
-                          <h4 className="text-[11px] font-bold uppercase tracking-wider pl-1" style={{ color: c.textMuted }}>Visão Geral Operacional</h4>
-                          
-                          <div className="grid grid-cols-2 gap-3">
-                            
-                            {/* Block: Financeiro */}
-                            <div onClick={() => setMobileTab("finance")} className={`p-3.5 border ${rounded.card} cursor-pointer hover:bg-slate-50 dark:hover:bg-[#18202A]/80 transition-all flex flex-col justify-between`}
-                              style={{ backgroundColor: c.card, borderColor: c.border }}
+                        {/* Selected day agenda */}
+                        <div className="p-3 bg-slate-950/50 border border-slate-850 rounded-xl space-y-3">
+                          <div className="flex justify-between items-center pb-2 border-b border-slate-850">
+                            <h4 className="text-[10px] uppercase font-bold text-slate-300">Agenda: Dia {selectedDay} de Junho</h4>
+                            <button
+                              type="button"
+                              onClick={() => triggerToast("Função de novo lembrete ativada")}
+                              className="text-[9px] font-bold bg-[#dfb26c] text-slate-950 px-2 py-0.5 rounded cursor-pointer transition-all"
                             >
-                              <div>
-                                <div className="flex items-center gap-2 mb-2">
-                                  <Wallet size={13} className="text-emerald-500" />
-                                  <span className="text-[10px] font-bold" style={{ color: c.text }}>Financeiro</span>
-                                </div>
-                                <span className="text-[10px] block" style={{ color: c.textMuted }}>Lucro Líquido</span>
-                              </div>
-                              <div className="flex items-center justify-between mt-2.5">
-                                <strong className="text-sm font-black text-emerald-500 font-mono block">R$ {netProfit.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}</strong>
-                                <svg className="w-10 h-5 text-emerald-500 opacity-80" viewBox="0 0 50 20" fill="none">
-                                  <path d="M2 15 Q 12 18, 22 8 T 48 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                                </svg>
-                              </div>
-                            </div>
+                              + Novo Lembrete
+                            </button>
+                          </div>
 
-                            {/* Block: Operacional */}
-                            <div onClick={() => setMobileTab("properties")} className={`p-3.5 border ${rounded.card} cursor-pointer hover:bg-slate-50 dark:hover:bg-[#18202A]/80 transition-all flex flex-col justify-between`}
-                              style={{ backgroundColor: c.card, borderColor: c.border }}
-                            >
-                              <div>
-                                <div className="flex items-center gap-2 mb-2">
-                                  <Building2 size={13} className="text-blue-500" />
-                                  <span className="text-[10px] font-bold" style={{ color: c.text }}>Operacional</span>
-                                </div>
-                                <span className="text-[10px] block" style={{ color: c.textMuted }}>Imóveis Ativos</span>
-                              </div>
-                              <div className="mt-2.5">
-                                <strong className="text-sm font-black text-blue-500 block">{properties.length} Unidades</strong>
-                                <div className="mt-2 space-y-1">
-                                  <div className="flex justify-between text-[7px] font-bold" style={{ color: c.textMuted }}>
-                                    <span>Ocupação</span>
-                                    <span>{averageOccupancy}%</span>
-                                  </div>
-                                  <div className="w-full h-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                    <div className="h-full bg-blue-500 rounded-full" style={{ width: `${averageOccupancy}%` }} />
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
+                          <div className="space-y-2">
+                            {/* Filter bookings & reminders for selectedDay */}
+                            {(() => {
+                              const dayStr = selectedDay < 10 ? `0${selectedDay}` : `${selectedDay}`;
+                              const dateStr = `2026-06-${dayStr}`;
+                              const checkIns = bookings.filter(b => b.checkIn === dateStr);
+                              const checkOuts = bookings.filter(b => b.checkOut === dateStr);
+                              const dayReminders = reminders.filter(r => r.day === selectedDay && r.month === 6 && r.year === 2026);
 
-                            {/* Block: Manutenção */}
-                            <div onClick={() => triggerToast("Central de Manutenções mobile")} className={`p-3.5 border ${rounded.card} cursor-pointer hover:bg-slate-50 dark:hover:bg-[#18202A]/80 transition-all flex flex-col justify-between`}
-                              style={{ backgroundColor: c.card, borderColor: c.border }}
-                            >
-                              <div>
-                                <div className="flex items-center gap-2 mb-2">
-                                  <Wrench size={13} className="text-amber-500" />
-                                  <span className="text-[10px] font-bold" style={{ color: c.text }}>Manutenções</span>
-                                </div>
-                                <span className="text-[10px] block" style={{ color: c.textMuted }}>Chamados Ativos</span>
-                              </div>
-                              <div className="mt-2.5">
-                                <strong className="text-sm font-black text-amber-500 block">4 Pendentes</strong>
-                                <div className="flex items-center gap-1 mt-2 text-[8px] font-bold" style={{ color: c.warning }}>
-                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500/60" />
-                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-700" />
-                                  <span className="pl-0.5 tracking-wider">ATENÇÃO</span>
-                                </div>
-                              </div>
-                            </div>
+                              const hasEvents = checkIns.length > 0 || checkOuts.length > 0 || dayReminders.length > 0;
 
-                            {/* Block: Documentação */}
-                            <div onClick={() => setMobileTab("documents")} className={`p-3.5 border ${rounded.card} cursor-pointer hover:bg-slate-50 dark:hover:bg-[#18202A]/80 transition-all flex flex-col justify-between`}
-                              style={{ backgroundColor: c.card, borderColor: c.border }}
-                            >
-                              <div>
-                                <div className="flex items-center gap-2 mb-2">
-                                  <FileText size={13} className="text-purple-500" />
-                                  <span className="text-[10px] font-bold" style={{ color: c.text }}>Documentos</span>
-                                </div>
-                                <span className="text-[10px] block" style={{ color: c.textMuted }}>Vencimentos</span>
-                              </div>
-                              <div className="mt-2.5">
-                                <strong className="text-sm font-black text-purple-500 block">Assinados</strong>
-                                <div className="flex items-center gap-1 mt-2.5 text-[8.5px] font-bold text-emerald-500">
-                                  <CheckCircle2 size={10} />
-                                  <span className="tracking-wide">TUDO EM DIA</span>
-                                </div>
-                              </div>
-                            </div>
+                              if (!hasEvents) {
+                                return <p className="text-[9px] text-slate-600 text-center py-2">Nenhum evento registrado para este dia.</p>;
+                              }
 
+                              return (
+                                <>
+                                  {checkIns.map((b, i) => (
+                                    <div key={`ci-${i}`} className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex items-center justify-between">
+                                      <div>
+                                        <strong className="block text-[9.5px] text-slate-100">{b.guestName}</strong>
+                                        <span className="text-[8px] text-emerald-400 block font-bold uppercase tracking-wider mt-0.5">📥 Check-In</span>
+                                      </div>
+                                      <span className="text-[9.5px] font-mono text-slate-400">R$ {b.value.toLocaleString("pt-BR")}</span>
+                                    </div>
+                                  ))}
+                                  {checkOuts.map((b, i) => (
+                                    <div key={`co-${i}`} className="p-2.5 bg-rose-500/10 border border-rose-500/20 rounded-lg flex items-center justify-between">
+                                      <div>
+                                        <strong className="block text-[9.5px] text-slate-100">{b.guestName}</strong>
+                                        <span className="text-[8px] text-rose-400 block font-bold uppercase tracking-wider mt-0.5">📤 Check-Out</span>
+                                      </div>
+                                      <span className="text-[9.5px] font-mono text-slate-400">Checkout</span>
+                                    </div>
+                                  ))}
+                                  {dayReminders.map((r, i) => (
+                                    <div key={`rem-${i}`} className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-center justify-between">
+                                      <div>
+                                        <strong className="block text-[9.5px] text-slate-100">{r.title}</strong>
+                                        <span className="text-[8px] text-amber-400 block mt-0.5">⏰ {r.time} &bull; {r.guestName}</span>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => fireWebhook({ event: "reminder", title: r.title })}
+                                        className="text-[8px] border border-amber-500/35 text-amber-400 px-2 py-0.5 rounded hover:bg-amber-500/20 transition-all cursor-pointer"
+                                      >
+                                        Testar URL
+                                      </button>
+                                    </div>
+                                  ))}
+                                </>
+                              );
+                            })()}
                           </div>
                         </div>
 
-                        {/* Quick Access Horizontal Pills */}
-                        <div className="space-y-2">
-                          <h4 className="text-[11px] font-bold uppercase tracking-wider pl-1" style={{ color: c.textMuted }}>Ações Rápidas</h4>
-                          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none select-none">
-                            {[
-                              { label: "Propriedades", action: () => setMobileTab("properties") },
-                              { label: "Lançar Receita", action: () => { setIsFabMenuOpen(true); triggerToast("Selecione Nova Receita"); } },
-                              { label: "Lançar Despesa", action: () => { setIsFabMenuOpen(true); triggerToast("Selecione Nova Despesa"); } },
-                              { label: "Ver Relatório", action: () => triggerToast("Relatórios gerenciais") }
-                            ].map((pill, idx) => (
-                              <button key={idx} 
-                                onClick={pill.action}
-                                className={`px-4 py-2 text-[10px] font-bold shrink-0 border border-slate-200 dark:border-slate-800 ${rounded.pill} bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-850 cursor-pointer`}
-                                style={{ color: c.text }}
-                              >
-                                {pill.label}
-                              </button>
-                            ))}
+                        {/* Webhook integration panel */}
+                        <div className="p-3.5 bg-slate-950/50 border border-slate-850 rounded-xl space-y-3">
+                          <span className="text-[10px] uppercase font-bold text-slate-300 block">Webhook Integration</span>
+                          <div className="space-y-1">
+                            <label className="text-[8px] text-slate-500 uppercase block font-semibold font-mono">Endereço do Webhook (POST)</label>
+                            <input 
+                              type="text" 
+                              value={webhookUrl}
+                              onChange={e => setWebhookUrl(e.target.value)}
+                              className="w-full bg-slate-900 border border-slate-800 p-2 rounded text-[9.5px] text-white font-mono focus:outline-none"
+                              placeholder="https://hook.us1.make.com/..."
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => fireWebhook({ test: true, system: "PWA Simulator", message: "Teste via Mobile" })}
+                              className="flex-1 bg-[#dfb26c] hover:bg-[#c89e58] text-slate-950 rounded-lg py-1.5 text-[9px] font-black cursor-pointer transition-all"
+                            >
+                              Tester Conexão
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(webhookUrl);
+                                triggerToast("URL copiada!");
+                              }}
+                              className="w-1/3 bg-slate-900 border border-slate-800 text-white rounded-lg py-1.5 text-[9px] font-bold cursor-pointer hover:bg-slate-850 transition-all"
+                            >
+                              Copiar URL
+                            </button>
                           </div>
                         </div>
 
                       </div>
                     )}
 
-                    {/* ═══ TAB: PROPERTIES ═══ */}
+                    {/* 🏡 SCREEN 3: VISÃO GERAL DAS PROPRIEDADES */}
                     {mobileTab === "properties" && (
-                      <div className="space-y-4 animate-fadeIn">
-                        <div className="flex justify-between items-center pb-1 border-b" style={{ borderColor: c.border }}>
-                          <h3 className="text-[14px] font-black" style={{ color: c.text }}>Seus Imóveis ({properties.length})</h3>
-                          <button 
-                            onClick={() => triggerToast("Adicionar imóvel via menu FAB (+)")} 
-                            className="p-1 rounded cursor-pointer transition-all"
-                            style={{ backgroundColor: `${c.accent}1a`, color: c.accent }}
-                          >
-                            <Plus size={14} />
-                          </button>
-                        </div>
+                      <div className="space-y-4 animate-fadeIn flex-1 overflow-y-auto pb-4 scrollbar-none text-xs">
+                        
+                        {/* Selected Featured Property Card */}
+                        {(() => {
+                          const featured = properties.find(p => p.id === featuredPropertyId) || properties[0];
+                          if (!featured) return null;
 
-                        <div className="space-y-3">
-                          {properties.map((p) => (
-                            <div key={p.id} 
-                              onClick={() => triggerToast(`Visualizando imóvel: ${p.name}`)}
-                              className={`p-3 border ${rounded.card} flex items-center gap-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-[#18202A]/80 transition-all`}
-                              style={{ backgroundColor: c.card, borderColor: c.border }}
-                            >
-                              <img src={p.image} alt={p.name} className="w-14 h-14 rounded-xl object-cover shrink-0" />
-                              <div className="flex-1 min-w-0">
-                                <div className="flex justify-between items-center gap-1">
-                                  <h4 className="text-xs font-bold truncate text-slate-900 dark:text-white">{p.name}</h4>
-                                  <span className="text-[7.5px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shrink-0">Ativo</span>
+                          // Compute simulated metrics based on mockup numbers
+                          // (Mockup displays Casa Amado with R$ 19.578, R$ 18.145, 68%)
+                          const isAmado = featured.id === "casa-amado";
+                          const displayRevenue = isAmado ? 19578.09 : (revenues.filter(r => r.propertyId === featured.id).reduce((s, r) => s + r.value, 0) || 12500);
+                          const displayExpense = isAmado ? 1432.89 : (expenses.filter(e => e.propertyId === featured.id).reduce((s, e) => s + e.value, 0) || 450);
+                          const displayProfit = displayRevenue - displayExpense;
+                          const displayOccupancy = isAmado ? 68 : 78;
+
+                          return (
+                            <div className="bg-slate-950/50 border border-slate-850 rounded-xl overflow-hidden animate-fadeIn">
+                              <img 
+                                src={featured.image || "https://images.unsplash.com/photo-1512917774080-9991f1c4c750"} 
+                                alt={featured.name} 
+                                className="w-full h-32 object-cover" 
+                              />
+                              <div className="p-3.5 space-y-3">
+                                <div className="flex justify-between items-center">
+                                  <h4 className="text-xs font-black text-slate-100">{featured.name}</h4>
+                                  <span className="text-[8px] font-bold text-[#dfb26c] bg-[#dfb26c]/10 border border-[#dfb26c]/20 px-2 py-0.5 rounded">
+                                    Destaque
+                                  </span>
                                 </div>
-                                <div className="flex items-center gap-1 text-[9px] mt-1" style={{ color: c.textMuted }}>
-                                  <MapPin size={9} />
-                                  <span className="truncate">{p.location}</span>
+
+                                <div className="grid grid-cols-3 gap-2 text-center border-t border-b border-slate-850/50 py-2.5">
+                                  <div>
+                                    <span className="text-[7.5px] text-slate-500 uppercase block font-semibold">Receita/Mês</span>
+                                    <strong className="text-[10px] text-slate-200 block mt-0.5 font-mono">
+                                      R$ {displayRevenue.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}
+                                    </strong>
+                                  </div>
+                                  <div>
+                                    <span className="text-[7.5px] text-slate-500 uppercase block font-semibold">Lucro</span>
+                                    <strong className="text-[10px] text-emerald-400 block mt-0.5 font-mono">
+                                      R$ {displayProfit.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}
+                                    </strong>
+                                  </div>
+                                  <div>
+                                    <span className="text-[7.5px] text-slate-500 uppercase block font-semibold">Ocupação</span>
+                                    <strong className="text-[10px] text-sky-400 block mt-0.5 font-mono">
+                                      {displayOccupancy}%
+                                    </strong>
+                                  </div>
                                 </div>
-                                <div className="flex justify-between items-center mt-1.5 font-mono text-[9px]">
-                                  <span style={{ color: c.textMuted }}>Quartos: {p.rooms}</span>
-                                  <span className="font-bold text-slate-800 dark:text-white">{p.sizeSqM} m²</span>
+
+                                <div className="flex gap-2">
+                                  <span className="text-[8px] bg-slate-900 border border-slate-800 text-slate-400 px-2.5 py-0.5 rounded-full font-bold">
+                                    {featured.rooms || 4} quartos
+                                  </span>
+                                  <span className="text-[8px] bg-slate-900 border border-slate-800 text-slate-400 px-2.5 py-0.5 rounded-full font-bold">
+                                    {featured.sizeSqM || 350} m²
+                                  </span>
                                 </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => triggerToast(`Detalhes: ${featured.description}`)}
+                                  className="w-full bg-[#dfb26c] text-slate-950 hover:bg-[#c89e58] rounded-lg py-2 text-[10px] font-bold cursor-pointer transition-all"
+                                >
+                                  Ver detalhes completos
+                                </button>
                               </div>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                          );
+                        })()}
 
-                    {/* ═══ TAB: FINANCEIRO ═══ */}
-                    {mobileTab === "finance" && (
-                      <div className="space-y-4 animate-fadeIn">
-                        <div className="pb-1 border-b" style={{ borderColor: c.border }}>
-                          <h3 className="text-[14px] font-black" style={{ color: c.text }}>Financeiro Consolidado</h3>
-                        </div>
-
-                        {/* Mini flow overview */}
-                        <div className={`p-4 border ${rounded.card} space-y-3`} style={{ backgroundColor: c.card, borderColor: c.border }}>
-                          <div className="flex justify-between text-xs">
-                            <span style={{ color: c.textMuted }}>Lucro Operacional</span>
-                            <span className="font-bold text-emerald-500">R$ {netProfit.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
-                          </div>
-                          <div className="flex justify-between text-xs border-t pt-2" style={{ borderColor: c.border }}>
-                            <span style={{ color: c.textMuted }}>Receitas</span>
-                            <span className="font-bold text-slate-900 dark:text-white">R$ {totalRevenues.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
-                          </div>
-                          <div className="flex justify-between text-xs border-t pt-2" style={{ borderColor: c.border }}>
-                            <span style={{ color: c.textMuted }}>Despesas</span>
-                            <span className="font-bold text-rose-500">R$ {totalExpenses.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
-                          </div>
-                        </div>
-
-                        {/* Recent Transactions List */}
-                        <div className="space-y-2">
-                          <h4 className="text-[10px] font-bold uppercase tracking-wider pl-1" style={{ color: c.textMuted }}>Últimos Lançamentos</h4>
-                          
-                          <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
-                            {revenues.slice(0, 3).map((r, i) => (
-                              <div key={`rev-${i}`} className={`p-2.5 border ${rounded.inner} flex justify-between items-center text-xs`}
-                                style={{ backgroundColor: c.card, borderColor: c.border }}
-                              >
-                                <div>
-                                  <strong className="block font-sans text-slate-800 dark:text-slate-100">{r.description || "Aluguel"}</strong>
-                                  <span className="text-[9px] block opacity-60 font-mono mt-0.5">{r.date}</span>
-                                </div>
-                                <strong className="text-emerald-500 font-mono">+ R$ {r.value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
-                              </div>
-                            ))}
-                            {expenses.slice(0, 3).map((e, i) => (
-                              <div key={`exp-${i}`} className={`p-2.5 border ${rounded.inner} flex justify-between items-center text-xs`}
-                                style={{ backgroundColor: c.card, borderColor: c.border }}
-                              >
-                                <div>
-                                  <strong className="block font-sans text-slate-800 dark:text-slate-100">{e.description || "Manutenção"}</strong>
-                                  <span className="text-[9px] block opacity-60 font-mono mt-0.5">{e.date}</span>
-                                </div>
-                                <strong className="text-rose-500 font-mono">- R$ {e.value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* ═══ TAB: DOCUMENTS ═══ */}
-                    {mobileTab === "documents" && (
-                      <div className="space-y-4 animate-fadeIn">
-                        <div className="pb-1 border-b" style={{ borderColor: c.border }}>
-                          <h3 className="text-[14px] font-black" style={{ color: c.text }}>Central de Documentos</h3>
-                        </div>
-
-                        {/* Search Bar */}
-                        <div className="flex items-center gap-2 px-3 py-2 rounded-xl border text-xs" style={{ backgroundColor: c.surface, borderColor: c.border }}>
-                          <Search size={14} style={{ color: c.textMuted }} />
-                          <input type="text" placeholder="Buscar contratos ou recibos..." className="bg-transparent flex-1 focus:outline-none" />
-                        </div>
-
-                        {/* List */}
+                        {/* Scrollable properties list below */}
                         <div className="space-y-2.5">
-                          {[
-                            { name: "Contrato de Locação - Casa Lilian.pdf", size: "2.4 MB", type: "Contrato", date: "12/04/2026", status: "Assinado", icon: FileCheck, color: "text-emerald-500" },
-                            { name: "Apólice de Seguro - Predinho.pdf", size: "1.8 MB", type: "Seguro", date: "28/03/2026", status: "Ativo", icon: FileText, color: "text-blue-500" },
-                            { name: "Recibo de Pintura - Casa Vintage.pdf", size: "512 KB", type: "Fatura", date: "15/05/2026", status: "Pago", icon: DollarSign, color: "text-amber-500" },
-                            { name: "Escritura Oficial - Casa Mayla.pdf", size: "12.8 MB", type: "Cartório", date: "02/01/2025", status: "Registrado", icon: Briefcase, color: "text-purple-500" }
-                          ].map((doc, idx) => {
-                            const Icon = doc.icon;
-                            return (
-                              <div key={idx} 
-                                onClick={() => triggerToast(`Download iniciado: ${doc.name}`)}
-                                className={`p-3 border ${rounded.card} flex items-center gap-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-[#18202A]/80 transition-all`}
-                                style={{ backgroundColor: c.card, borderColor: c.border }}
+                          <h4 className="text-[9px] uppercase font-bold text-slate-500 tracking-wider pl-1">Outras Propriedades</h4>
+                          <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
+                            {properties.map(p => (
+                              <div
+                                key={p.id}
+                                onClick={() => setFeaturedPropertyId(p.id)}
+                                className={`p-2.5 border ${rounded.card} flex items-center gap-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-[#18202A]/80 transition-all ${
+                                  featuredPropertyId === p.id ? "bg-[#dfb26c]/5 border-[#dfb26c]/40" : "bg-slate-950/40 border-slate-850"
+                                }`}
                               >
-                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-slate-100 dark:bg-slate-800 ${doc.color}`}>
-                                  <Icon size={14} />
-                                </div>
-                                <div className="flex-1 min-w-0 text-xs">
-                                  <h5 className="font-bold truncate text-slate-800 dark:text-slate-100">{doc.name}</h5>
-                                  <div className="flex justify-between items-center text-[9px] mt-1" style={{ color: c.textMuted }}>
-                                    <span>{doc.size} &bull; {doc.type}</span>
-                                    <span className="font-bold uppercase" style={{ color: c.success }}>{doc.status}</span>
+                                <img src={p.image} alt={p.name} className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                                <div className="flex-1 min-w-0 text-[10px]">
+                                  <div className="flex justify-between items-center">
+                                    <strong className="block text-slate-200 truncate">{p.name}</strong>
+                                    <span className="text-[8px] text-slate-500 truncate font-mono">{p.location}</span>
+                                  </div>
+                                  <div className="flex justify-between mt-1 text-[8.5px] text-slate-500 font-mono">
+                                    <span>Receita: R$ {(revenues.filter(r => r.propertyId === p.id).reduce((s, r) => s + r.value, 0) || 12500).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}</span>
+                                    <span className="font-sans font-bold">{p.rooms} qts</span>
                                   </div>
                                 </div>
                               </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* ═══ TAB: PROFILE ═══ */}
-                    {mobileTab === "profile" && (
-                      <div className="space-y-5 animate-fadeIn">
-                        
-                        {/* Avatar overview */}
-                        <div className="flex flex-col items-center justify-center text-center p-4 border rounded-2xl"
-                          style={{ backgroundColor: c.card, borderColor: c.border }}
-                        >
-                          <div 
-                            className="w-16 h-16 rounded-full text-white text-xl font-extrabold flex items-center justify-center shadow-lg text-keep-white mb-2"
-                            style={{ backgroundColor: c.accent }}
-                          >
-                            HK
+                            ))}
                           </div>
-                          <h4 className="text-sm font-black" style={{ color: c.text }}>Casa Select</h4>
-                          <span className="text-[10px] uppercase font-bold tracking-wider" style={{ color: c.textMuted }}>Administrador Geral</span>
-                        </div>
-
-                        {/* Actions */}
-                        <div className="space-y-2">
-                          <button 
-                            onClick={() => triggerToast("Preferências salvas")}
-                            className="w-full p-3.5 border rounded-xl flex items-center justify-between text-xs font-semibold cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
-                            style={{ backgroundColor: c.card, borderColor: c.border, color: c.text }}
-                          >
-                            <span>Configurações do App</span>
-                            <ChevronRight size={14} style={{ color: c.textMuted }} />
-                          </button>
-                          
-                          <button 
-                            onClick={() => triggerToast("Central de Segurança")}
-                            className="w-full p-3.5 border rounded-xl flex items-center justify-between text-xs font-semibold cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
-                            style={{ backgroundColor: c.card, borderColor: c.border, color: c.text }}
-                          >
-                            <span>Segurança e Biometria</span>
-                            <ChevronRight size={14} style={{ color: c.textMuted }} />
-                          </button>
-
-                          <button 
-                            onClick={() => {
-                              setMobileScreen("login");
-                              triggerToast("Desconectado da conta.");
-                            }}
-                            className="w-full p-3.5 border rounded-xl flex items-center justify-between text-xs font-bold cursor-pointer text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20"
-                            style={{ backgroundColor: c.card, borderColor: c.border }}
-                          >
-                            <span className="flex items-center gap-2">
-                              <LogOut size={14} />
-                              Sair da Conta
-                            </span>
-                            <ChevronRight size={14} />
-                          </button>
                         </div>
 
                       </div>
@@ -964,8 +1395,18 @@ export default function PWASimulator({
 
                   </div>
                 )}
-
-              </div>
+                                   {/* Floating Action Button (FAB) */}
+              {mobileScreen === "dashboard" && (
+                <button 
+                  onClick={() => setIsFabMenuOpen(true)}
+                  className="absolute bottom-20 right-4 w-11 h-11 rounded-full bg-[#dfb26c] text-slate-950 flex items-center justify-center cursor-pointer shadow-lg active:scale-95 hover:scale-105 transition-all z-40"
+                  style={{ 
+                    boxShadow: "0 4px 14px rgba(223, 178, 108, 0.4)"
+                  }}
+                >
+                  <Plus size={22} strokeWidth={3} />
+                </button>
+              )}
 
               {/* ═══════════════════════════════════════ */}
               {/*  FAB BOTTOM MENU (Ação Central)         */}
@@ -983,7 +1424,7 @@ export default function PWASimulator({
                     style={{ borderColor: c.border }}
                   >
                     <div className="flex justify-between items-center">
-                      <h4 className="text-xs font-bold uppercase tracking-wider" style={{ color: c.textMuted }}>Criar Novo Registro</h4>
+                      <h4 className="text-xs font-bold uppercase tracking-wider" style={{ color: c.textMuted }}>Central de Ações</h4>
                       <button 
                         onClick={() => setIsFabMenuOpen(false)}
                         className="p-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 cursor-pointer"
@@ -994,10 +1435,10 @@ export default function PWASimulator({
 
                     <div className="grid grid-cols-2 gap-3">
                       {[
-                        { title: "Lançar Receita", desc: "Registrar ganho", icon: TrendingUp, color: "text-emerald-500 bg-emerald-500/10", action: () => triggerToast("Formulário de Receita ativado") },
-                        { title: "Lançar Despesa", desc: "Registrar custo", icon: TrendingDown, color: "text-rose-500 bg-rose-500/10", action: () => triggerToast("Formulário de Despesa ativado") },
-                        { title: "Novo Imóvel", desc: "Expandir portfólio", icon: Building2, color: "text-blue-500 bg-blue-500/10", action: () => triggerToast("Formulário de Novo Imóvel ativado") },
-                        { title: "Novo Contrato", desc: "Locação / Anual", icon: FileText, color: "text-purple-500 bg-purple-500/10", action: () => triggerToast("Formulário de Novo Contrato ativado") }
+                        { title: "📷 Tirar Foto (Câmera)", desc: "Captura direta", icon: Camera, color: "text-rose-500 bg-rose-500/10", action: () => mobileCameraInputRef.current?.click() },
+                        { title: "📄 Subir PDF/Comprovante", desc: "Escolher arquivo", icon: FileText, color: "text-sky-500 bg-sky-500/10", action: () => mobileFileInputRef.current?.click() },
+                        { title: "⏰ Novo Lembrete", desc: "Adicionar na Agenda", icon: Calendar, color: "text-amber-500 bg-amber-500/10", action: () => { setMobileTab("calendar"); triggerToast("Defina o dia e adicione lembrete!"); } },
+                        { title: "🏡 Nova Propriedade", desc: "Adicionar imóvel", icon: Building2, color: "text-blue-500 bg-blue-500/10", action: () => triggerToast("Formulário de nova propriedade") }
                       ].map((item, idx) => {
                         const Icon = item.icon;
                         return (
@@ -1035,67 +1476,42 @@ export default function PWASimulator({
                     boxShadow: isDark ? "0 -4px 15px rgba(0,0,0,0.5)" : "0 -2px 10px rgba(0,0,0,0.03)"
                   }}
                 >
-                  {/* Home Tab */}
+                  {/* OCR Tab */}
                   <button 
-                    onClick={() => setMobileTab("home")} 
-                    className="flex flex-col items-center justify-center w-11 h-11 transition-all cursor-pointer relative"
-                    style={{ color: mobileTab === "home" ? c.accent : c.textMuted }}
+                    onClick={() => setMobileTab("ocr")} 
+                    className="flex flex-col items-center justify-center w-16 h-11 transition-all cursor-pointer relative"
+                    style={{ color: mobileTab === "ocr" ? c.accent : c.textMuted }}
                   >
-                    <Home size={17} strokeWidth={mobileTab === "home" ? 2.5 : 1.8} />
-                    <span className="text-[8px] font-bold mt-0.5">Início</span>
-                    {mobileTab === "home" && (
-                      <span className="absolute bottom-0 w-1.5 h-1.5 rounded-full bg-rose-600 animate-bounce" />
+                    <Camera size={17} strokeWidth={mobileTab === "ocr" ? 2.5 : 1.8} />
+                    <span className="text-[8px] font-bold mt-0.5">Leitor OCR</span>
+                    {mobileTab === "ocr" && (
+                      <span className="absolute bottom-0 w-1.5 h-1.5 rounded-full bg-[#dfb26c] animate-bounce" />
+                    )}
+                  </button>
+
+                  {/* Calendar Tab */}
+                  <button 
+                    onClick={() => setMobileTab("calendar")} 
+                    className="flex flex-col items-center justify-center w-16 h-11 transition-all cursor-pointer relative"
+                    style={{ color: mobileTab === "calendar" ? c.accent : c.textMuted }}
+                  >
+                    <Calendar size={17} strokeWidth={mobileTab === "calendar" ? 2.5 : 1.8} />
+                    <span className="text-[8px] font-bold mt-0.5">Calendário</span>
+                    {mobileTab === "calendar" && (
+                      <span className="absolute bottom-0 w-1.5 h-1.5 rounded-full bg-[#dfb26c] animate-bounce" />
                     )}
                   </button>
 
                   {/* Properties Tab */}
                   <button 
                     onClick={() => setMobileTab("properties")} 
-                    className="flex flex-col items-center justify-center w-11 h-11 transition-all cursor-pointer relative"
+                    className="flex flex-col items-center justify-center w-16 h-11 transition-all cursor-pointer relative"
                     style={{ color: mobileTab === "properties" ? c.accent : c.textMuted }}
                   >
                     <Building2 size={17} strokeWidth={mobileTab === "properties" ? 2.5 : 1.8} />
                     <span className="text-[8px] font-bold mt-0.5">Imóveis</span>
                     {mobileTab === "properties" && (
-                      <span className="absolute bottom-0 w-1.5 h-1.5 rounded-full bg-rose-600 animate-bounce" />
-                    )}
-                  </button>
-
-                  {/* Center FAB action (+) */}
-                  <button 
-                    onClick={() => setIsFabMenuOpen(true)}
-                    className="w-11 h-11 rounded-full flex items-center justify-center cursor-pointer transition-all active:scale-90 hover:scale-105 shadow-md shadow-red-950/20"
-                    style={{ 
-                      backgroundColor: c.accent,
-                      color: "#FFFFFF"
-                    }}
-                  >
-                    <Plus size={22} strokeWidth={2.5} />
-                  </button>
-
-                  {/* Finance Tab */}
-                  <button 
-                    onClick={() => setMobileTab("finance")} 
-                    className="flex flex-col items-center justify-center w-11 h-11 transition-all cursor-pointer relative"
-                    style={{ color: mobileTab === "finance" ? c.accent : c.textMuted }}
-                  >
-                    <DollarSign size={17} strokeWidth={mobileTab === "finance" ? 2.5 : 1.8} />
-                    <span className="text-[8px] font-bold mt-0.5 font-mono">Financeiro</span>
-                    {mobileTab === "finance" && (
-                      <span className="absolute bottom-0 w-1.5 h-1.5 rounded-full bg-rose-600 animate-bounce" />
-                    )}
-                  </button>
-
-                  {/* Profile/Settings Tab */}
-                  <button 
-                    onClick={() => setMobileTab("profile")} 
-                    className="flex flex-col items-center justify-center w-11 h-11 transition-all cursor-pointer relative"
-                    style={{ color: mobileTab === "profile" ? c.accent : c.textMuted }}
-                  >
-                    <User size={17} strokeWidth={mobileTab === "profile" ? 2.5 : 1.8} />
-                    <span className="text-[8px] font-bold mt-0.5">Perfil</span>
-                    {mobileTab === "profile" && (
-                      <span className="absolute bottom-0 w-1.5 h-1.5 rounded-full bg-rose-600 animate-bounce" />
+                      <span className="absolute bottom-0 w-1.5 h-1.5 rounded-full bg-[#dfb26c] animate-bounce" />
                     )}
                   </button>
                 </div>
@@ -1104,46 +1520,81 @@ export default function PWASimulator({
             </div>
           </div>
         </div>
+      </div>
 
         {/* ═══════════════════════════════════════════════════ */}
-        {/*  RIGHT PANEL - UX/UI Documentation and Features    */}
+        {/*  RIGHT PANEL - PWA Installation & UX Documentation  */}
         {/* ═══════════════════════════════════════════════════ */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-          <div className="flex items-center gap-2">
-            <Sparkles size={18} className="text-rose-500 animate-spin" style={{ animationDuration: "6s" }} />
-            <h3 className="font-display font-extrabold text-sm text-white uppercase tracking-wider">PropertyOS Mobile UX 3.0</h3>
-          </div>
-
-          <div className="space-y-4 text-xs text-slate-300 leading-relaxed">
-            <p>Implementamos um redesenho completo da experiência mobile do simulador, focando em minimalismo executivo e inteligência operacional.</p>
-            
-            <div className="space-y-3 pt-2">
-              {[
-                { title: "Arquitetura Japonesa Contemporânea", desc: "Arte vetorial em SVG customizada no cabeçalho do login, com o monte Fuji e a cerejeira sakura, criando uma assinatura visual luxuosa." },
-                { title: "Dashboard Executivo e Inteligente", desc: "Hero area com patrimônio geral sob gestão e KPIs simplificados, reduzindo a poluição de dezenas de cartões no carregamento inicial." },
-                { title: "Seção Exclusiva de IA Insights", desc: "Visualizações horizontais (pills de scroll) com cartões gerenciais preditivos que ajudam na tomada de decisão imediata." },
-                { title: "Stripe & Revolut Navigation System", desc: "Aba inferior limpa com botão central flutuante (+) que abre uma Bottom Sheet animada para lançamentos rápidos (Receitas, Despesas, Contratos)." },
-                { title: "Novo Sistema de Cores e Bordas Sólidas", desc: "Modo Escuro com background #0A0F14 e cards #18202A. Modo Claro com background #FAFBFC e cards #FFFFFF. Bordas circulares premium de 16px." }
-              ].map((item, idx) => (
-                <div key={idx} className="flex items-start gap-3 bg-slate-950/40 p-3 rounded-xl border border-slate-800/80">
-                  <div className="w-5 h-5 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center font-bold font-mono text-[10px] shrink-0 mt-0.5">{idx + 1}</div>
-                  <div>
-                    <h5 className="font-bold text-white text-[11px]">{item.title}</h5>
-                    <p className="text-slate-400 text-[10px] mt-0.5">{item.desc}</p>
-                  </div>
+        <div className="space-y-6">
+          {/* PWA Installation/Download Card */}
+          {!isPWA && (
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-5">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-rose-500/10 rounded-xl text-rose-500">
+                  <Smartphone size={24} />
                 </div>
-              ))}
+                <div>
+                  <h3 className="font-display font-extrabold text-sm text-white uppercase tracking-wider">Instalar Aplicativo Oficial (PWA)</h3>
+                  <p className="text-slate-400 text-[10px] font-semibold mt-0.5">Acesse a Casa Select de forma rápida e offline pela tela inicial do seu celular.</p>
+                </div>
+              </div>
+
+              <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-800/80 space-y-3.5">
+                  <button
+                    onClick={handleInstallClick}
+                    className="w-full flex items-center justify-center gap-2 bg-[#dfb26c] hover:bg-[#c99f5d] text-slate-950 font-bold text-xs py-3 px-4 rounded-xl cursor-pointer transition-all shadow-md shadow-[#dfb26c]/10"
+                  >
+                    <Smartphone size={15} strokeWidth={2.5} />
+                    Baixar e Instalar PWA
+                  </button>
+
+                  <div className="border-t border-slate-800/80 pt-3 space-y-1.5 text-[10px] text-slate-400">
+                    <span className="font-bold text-slate-300 block uppercase tracking-wide text-[9px]">Como instalar no Celular:</span>
+                    <p className="leading-tight"><strong className="text-slate-300">iOS (Safari):</strong> Toque em Compartilhar <span className="inline-block border border-slate-700 px-1 rounded bg-slate-800">⎙</span> e depois em <strong>Adicionar à Tela de Início</strong>.</p>
+                    <p className="leading-tight"><strong className="text-slate-300">Android (Chrome):</strong> Toque nos três pontos e depois em <strong>Instalar aplicativo</strong>.</p>
+                  </div>
+              </div>
             </div>
-            
-            <p className="text-[11.5px] text-slate-400 italic bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
-              💡 <strong>Instruções de Teste</strong>:<br />
-              1. Clique na biometria ou preencha o formulário para fazer login no simulador.<br />
-              2. Explore as abas (Início, Imóveis, Financeiro, Perfil) e mude o tema geral para testar o Dark/Light Mode.<br />
-              3. Clique no botão vermelho central (+) para abrir a Bottom Sheet de ações!
-            </p>
+          )}
+
+          {/* Original Documentation Card */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <Sparkles size={18} className="text-rose-500 animate-spin" style={{ animationDuration: "6s" }} />
+              <h3 className="font-display font-extrabold text-sm text-white uppercase tracking-wider">PropertyOS Mobile UX 3.0</h3>
+            </div>
+
+            <div className="space-y-4 text-xs text-slate-300 leading-relaxed">
+              <p>Implementamos um redesenho completo da experiência mobile do simulador, focando em minimalismo executivo e inteligência operacional.</p>
+              
+              <div className="space-y-3 pt-2">
+                {[
+                  { title: "Arquitetura Japonesa Contemporânea", desc: "Arte vetorial em SVG customizada no cabeçalho do login, com o monte Fuji e a cerejeira sakura, criando uma assinatura visual luxuosa." },
+                  { title: "Dashboard Executivo e Inteligente", desc: "Hero area com patrimônio geral sob gestão e KPIs simplificados, reduzindo a poluição de dezenas de cartões no carregamento inicial." },
+                  { title: "Seção Exclusiva de IA Insights", desc: "Visualizações horizontais (pills de scroll) com cartões gerenciais preditivos que ajudam na tomada de decisão imediata." },
+                  { title: "Stripe & Revolut Navigation System", desc: "Aba inferior limpa com botão central flutuante (+) que abre uma Bottom Sheet animada para lançamentos rápidos (Receitas, Despesas, Contratos)." },
+                  { title: "Novo Sistema de Cores e Bordas Sólidas", desc: "Modo Escuro com background #0A0F14 e cards #18202A. Modo Claro com background #FAFBFC e cards #FFFFFF. Bordas circulares premium de 16px." }
+                ].map((item, idx) => (
+                  <div key={idx} className="flex items-start gap-3 bg-slate-950/40 p-3 rounded-xl border border-slate-800/80">
+                    <div className="w-5 h-5 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center font-bold font-mono text-[10px] shrink-0 mt-0.5">{idx + 1}</div>
+                    <div>
+                      <h5 className="font-bold text-white text-[11px]">{item.title}</h5>
+                      <p className="text-slate-400 text-[10px] mt-0.5">{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              <p className="text-[11.5px] text-slate-400 italic bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
+                💡 <strong>Instruções de Teste</strong>:<br />
+                1. Clique na biometria ou preencha o formulário para fazer login no simulador.<br />
+                2. Explore as abas (Início, Imóveis, Financeiro, Perfil) e mude o tema geral para testar o Dark/Light Mode.<br />
+                3. Clique no botão vermelho central (+) para abrir a Bottom Sheet de ações!
+              </p>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

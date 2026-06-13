@@ -3,6 +3,11 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dns from "dns";
+import dotenv from "dotenv";
+import { createClient } from "@supabase/supabase-js";
+
+// Load environment variables
+dotenv.config();
 
 // Prevent localhost resolution slowness
 dns.setDefaultResultOrder("ipv4first");
@@ -15,7 +20,7 @@ import {
   INITIAL_BOOKINGS, 
   INITIAL_ASSETS, 
   INITIAL_MAINTENANCES 
-} from "./src/data/initialData";
+} from "./api/initialData";
 import { Property, Revenue, Expense, Booking, Asset, Maintenance, ExpenseCategory, PropertyOrigin, BookingStatus, MaintenanceStatus, MaintenanceType, AssetCategory, Supplier, Document } from "./src/types";
 
 // Setup server memory-based database
@@ -611,9 +616,14 @@ Sua única saída DEVE SER um arquivo JSON puro, que siga o seguinte esquema Typ
 
       // Convert Base64 payload to conform with Gemini SDK Part structure
       const base64Data = imageBase64.split(";base64,").pop() || imageBase64;
+      let mimeType = "image/png";
+      const mimeMatch = imageBase64.match(/^data:(.*);base64,/);
+      if (mimeMatch) {
+        mimeType = mimeMatch[1];
+      }
       const imagePart = {
         inlineData: {
-          mimeType: "image/png", // We trust png/jpeg structure
+          mimeType,
           data: base64Data
         }
       };
@@ -651,6 +661,25 @@ Sua única saída DEVE SER um arquivo JSON puro, que siga o seguinte esquema Typ
       console.error("Erro no OCR Gemini:", err);
       const fallback = simulateOCRReader(imageBase64, properties);
       res.json(fallback);
+    }
+  });
+
+  // WEBHOOK PROXY DISPATCHER (To prevent CORS issues on client-side fetch)
+  app.post("/api/webhook/dispatch", async (req, res) => {
+    const { url, payload } = req.body;
+    if (!url) {
+      return res.status(400).json({ success: false, message: "URL do Webhook é obrigatória." });
+    }
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.text();
+      res.status(response.status).send(data);
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error?.message || error });
     }
   });
 

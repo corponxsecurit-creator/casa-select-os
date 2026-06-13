@@ -1,8 +1,11 @@
-const CACHE_NAME = "casa-select-cache-v1";
+const CACHE_NAME = "casa-select-cache-v3";
 const ASSETS_TO_CACHE = [
   "/",
   "/index.html",
   "/icon.svg",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/apple-touch-icon.png",
   "/manifest.json"
 ];
 

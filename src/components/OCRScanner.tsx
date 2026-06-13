@@ -52,6 +52,9 @@ export default function OCRScanner({ properties, onExpenseAdded, onClose }: OCRS
     description: string;
   } | null>(null);
 
+  const cameraInputRef = React.useRef<HTMLInputElement>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
   // Read actual file uploads
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -192,18 +195,48 @@ export default function OCRScanner({ properties, onExpenseAdded, onClose }: OCRS
         
         {/* Upload Container */}
         <div className="space-y-3">
-          <label className="border-2 border-dashed border-slate-800 hover:border-slate-700 bg-slate-950/60 rounded-xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-all h-40">
+          <div className="border-2 border-dashed border-slate-800 bg-slate-950/60 rounded-xl p-5 flex flex-col items-center justify-center text-center h-40 space-y-3">
             <input 
               type="file" 
+              ref={cameraInputRef}
               accept="image/*" 
+              capture="environment"
               className="hidden" 
               onChange={handleFileUpload} 
               disabled={loading}
             />
-            <Upload size={28} className="text-slate-500 mb-2 animate-bounce-slow" />
-            <span className="text-xs text-slate-300 font-semibold">Arraste ou Selecione Comprovante</span>
-            <span className="text-[10px] text-slate-500 mt-1">Imagens PNG, JPEG ou Nota Fiscal em PDF</span>
-          </label>
+            <input 
+              type="file" 
+              ref={fileInputRef}
+              accept="image/*,application/pdf" 
+              className="hidden" 
+              onChange={handleFileUpload} 
+              disabled={loading}
+            />
+            <div className="flex items-center gap-2 mb-1">
+              <Upload size={20} className="text-slate-500 animate-bounce-slow" />
+              <span className="text-xs text-slate-300 font-semibold">Capturar ou Subir Comprovante</span>
+            </div>
+            <div className="flex gap-2 w-full">
+              <button
+                type="button"
+                onClick={() => cameraInputRef.current?.click()}
+                className="flex-1 bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-white rounded-lg py-2 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+              >
+                <Camera size={14} className="text-rose-500" />
+                Tirar Foto
+              </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex-1 bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-white rounded-lg py-2 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+              >
+                <FileText size={14} className="text-sky-500" />
+                Subir Arquivo
+              </button>
+            </div>
+            <span className="text-[10px] text-slate-500">Imagens (PNG, JPEG) ou PDF</span>
+          </div>
 
           {/* Quick Pre-baked test scenarios */}
           <div className="space-y-2 select-none">

@@ -1,7 +1,10 @@
 import express from "express";
 import path from "path";
-import { GoogleGenAI } from "@google/genai";
+import { createServer as createViteServer } from "vite";
+import { GoogleGenAI, Type } from "@google/genai";
 import dns from "dns";
+import dotenv from "dotenv";
+import { createClient } from "@supabase/supabase-js";
 
 import { Property, Revenue, Expense, Booking, Asset, Maintenance, ExpenseCategory } from "../src/types";
 import { 
