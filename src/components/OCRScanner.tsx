@@ -52,6 +52,8 @@ export default function OCRScanner({ properties, onExpenseAdded, onClose }: OCRS
     description: string;
   } | null>(null);
 
+  const [currentReceiptImage, setCurrentReceiptImage] = React.useState<string | null>(null);
+
   const cameraInputRef = React.useRef<HTMLInputElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -74,6 +76,7 @@ export default function OCRScanner({ properties, onExpenseAdded, onClose }: OCRS
     setError("");
     setExtractedData(null);
     setSuccess(false);
+    setCurrentReceiptImage(base64Payload);
 
     try {
       const data = await scanReceiptOCR(base64Payload);
@@ -86,7 +89,7 @@ export default function OCRScanner({ properties, onExpenseAdded, onClose }: OCRS
 
       setExtractedData({
         value: Number(data.value) || 0,
-        date: data.date || "2026-06-06",
+        date: data.date || new Date().toISOString().split("T")[0],
         supplier: data.supplier || "Diversos",
         category: categoryMatch,
         propertyId: data.propertyId || "casa-lilian",
@@ -95,7 +98,16 @@ export default function OCRScanner({ properties, onExpenseAdded, onClose }: OCRS
 
     } catch (err: any) {
       console.error(err);
-      setError("Não foi possível decifrar o comprovante com inteligência de decisão. Escolha um comprovante ou simule.");
+      // Fallback: Populate form with manual parameters so they can confirm and save it anyway
+      setExtractedData({
+        value: 0,
+        date: new Date().toISOString().split("T")[0],
+        supplier: "Comprovante Carregado",
+        category: ExpenseCategory.OUTROS,
+        propertyId: properties[0]?.id || "casa-lilian",
+        description: "Envio de comprovante manual (Leitura automática indisponível)"
+      });
+      setError("Comprovante carregado. Ajuste os campos abaixo manualmente para salvar.");
     } finally {
       setLoading(false);
     }
@@ -107,6 +119,7 @@ export default function OCRScanner({ properties, onExpenseAdded, onClose }: OCRS
     setError("");
     setExtractedData(null);
     setSuccess(false);
+    setCurrentReceiptImage(null);
 
     // Short artificial delay for nice simulation effect
     await new Promise(resolve => setTimeout(resolve, 800));
@@ -160,11 +173,12 @@ export default function OCRScanner({ properties, onExpenseAdded, onClose }: OCRS
         value: extractedData.value,
         paymentMethod: "Pix",
         description: extractedData.description,
-        receipt: "Comprovante extraído via OCR inteligente"
+        receipt: currentReceiptImage || "Comprovante extraído via OCR inteligente"
       });
 
       setSuccess(true);
       setExtractedData(null);
+      setCurrentReceiptImage(null);
       onExpenseAdded();
 
     } catch (err: any) {

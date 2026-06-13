@@ -2541,8 +2541,28 @@ export default function App() {
                               <td className="p-3.5">{e.supplier}</td>
                               <td className="p-3.5 font-mono">{e.date}</td>
                               <td className="p-3.5 font-mono font-bold text-red-400">R$ {e.value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td>
-                              <td className="p-3.5">{e.paymentMethod}</td>
-                              <td className="p-3.5 truncate max-w-[120px]">{e.receipt || "Não inserido"}</td>
+                              <td className="p-3.5 truncate max-w-[120px]">{e.paymentMethod}</td>
+                              <td className="p-3.5 truncate max-w-[120px]">
+                                {e.receipt ? (
+                                  e.receipt.startsWith("data:") ? (
+                                    <button
+                                      onClick={() => {
+                                        const newTab = window.open();
+                                        if (newTab) {
+                                          newTab.document.write(`<iframe src="${e.receipt}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+                                        }
+                                      }}
+                                      className="text-emerald-400 hover:underline cursor-pointer font-bold flex items-center gap-1 text-[11px]"
+                                    >
+                                      📄 Ver Comprovante
+                                    </button>
+                                  ) : (
+                                    <span className="text-slate-400" title={e.receipt}>{e.receipt}</span>
+                                  )
+                                ) : (
+                                  <span className="text-slate-500">Não inserido</span>
+                                )}
+                              </td>
                               <td className="p-3.5 text-center">
                                 <div className="flex items-center justify-center gap-2.5">
                                   <button

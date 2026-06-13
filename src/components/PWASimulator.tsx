@@ -250,6 +250,8 @@ export default function PWASimulator({
     description: string;
   } | null>(null);
 
+  const [currentReceiptImage, setCurrentReceiptImage] = React.useState<string | null>(null);
+
   // References for direct camera vs file picker upload triggers
   const mobileCameraInputRef = React.useRef<HTMLInputElement>(null);
   const mobileFileInputRef = React.useRef<HTMLInputElement>(null);
@@ -363,6 +365,7 @@ export default function PWASimulator({
     setOcrError("");
     setOcrSuccess(false);
     setExtractedData(null);
+    setCurrentReceiptImage(base64Payload);
 
     try {
       const data = await scanReceiptOCR(base64Payload);
@@ -382,7 +385,16 @@ export default function PWASimulator({
       });
     } catch (err: any) {
       console.error(err);
-      setOcrError("Não foi possível decifrar o comprovante. Tente novamente ou use uma simulação.");
+      // Fallback: Populate form with manual parameters so they can confirm and save it anyway
+      setExtractedData({
+        value: 0,
+        date: new Date().toISOString().split("T")[0],
+        supplier: "Comprovante Carregado",
+        category: ExpenseCategory.OUTROS,
+        propertyId: properties[0]?.id || "casa-lilian",
+        description: "Envio de comprovante manual (Leitura automática indisponível)"
+      });
+      setOcrError("Não foi possível ler os dados automaticamente. Por favor, preencha os campos abaixo para concluir o lançamento.");
     } finally {
       setOcrLoading(false);
     }
@@ -393,6 +405,7 @@ export default function PWASimulator({
     setOcrError("");
     setOcrSuccess(false);
     setExtractedData(null);
+    setCurrentReceiptImage(null);
 
     await new Promise(r => setTimeout(r, 1000));
 
@@ -442,11 +455,12 @@ export default function PWASimulator({
         date: extractedData.date,
         value: extractedData.value,
         paymentMethod: "Pix",
-        receipt: "Lançamento via PWA (Gemini OCR)"
+        receipt: currentReceiptImage || "Lançamento via PWA (Gemini OCR)"
       });
 
       setOcrSuccess(true);
       setExtractedData(null);
+      setCurrentReceiptImage(null);
       
       onDataChanged();
 

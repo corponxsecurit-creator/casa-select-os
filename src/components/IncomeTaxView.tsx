@@ -222,8 +222,8 @@ export default function IncomeTaxView({ properties, revenues, expenses, onDataCh
 
     const reader = new FileReader();
     reader.onload = async (event) => {
+      const base64 = event.target?.result as string;
       try {
-        const base64 = event.target?.result as string;
         const ocrData = await scanReceiptOCR(base64);
 
         // Save scanned expense to DB
@@ -235,14 +235,30 @@ export default function IncomeTaxView({ properties, revenues, expenses, onDataCh
           value: Number(ocrData.value) || 0,
           paymentMethod: "Pix",
           description: `[Comprovante IR] ${ocrData.description || "Lançamento de Imposto de Renda"}`,
-          receipt: "Enviado via Central de Imposto de Renda"
+          receipt: base64
         });
 
         setUploadSuccess(true);
         onDataChanged();
       } catch (err: any) {
         console.error(err);
-        setUploadError("Não foi possível decifrar o comprovante. Tente inserir manualmente.");
+        // Save anyway even if OCR fails
+        try {
+          await addExpense({
+            propertyId: properties[0]?.id || "casa-lilian",
+            category: ExpenseCategory.TAXAS,
+            supplier: "Comprovante IR (Ajuste Manual)",
+            date: new Date().toISOString().split("T")[0],
+            value: 0,
+            paymentMethod: "Pix",
+            description: "[Comprovante IR] Lançamento manual (Leitura automática indisponível)",
+            receipt: base64
+          });
+          setUploadSuccess(true);
+          onDataChanged();
+        } catch (saveErr) {
+          setUploadError("Não foi possível salvar o comprovante.");
+        }
       } finally {
         setUploading(false);
       }
@@ -622,7 +638,22 @@ export default function IncomeTaxView({ properties, revenues, expenses, onDataCh
                       </td>
                       <td className="p-3 text-center text-[10px]">
                         {e.receipt ? (
-                          <span className="text-emerald-400" title={e.receipt}>Anexado ✅</span>
+                          e.receipt.startsWith("data:") ? (
+                            <button
+                              onClick={() => {
+                                const newTab = window.open();
+                                if (newTab) {
+                                  newTab.document.write(`<iframe src="${e.receipt}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+                                }
+                              }}
+                              className="text-emerald-400 hover:underline font-bold cursor-pointer"
+                              title="Clique para visualizar o comprovante anexado"
+                            >
+                              Ver Anexo 📄
+                            </button>
+                          ) : (
+                            <span className="text-emerald-400" title={e.receipt}>Anexado ✅</span>
+                          )
                         ) : (
                           <span className="text-slate-500">Pendente ⚠️</span>
                         )}

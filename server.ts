@@ -578,7 +578,7 @@ Por favor, responda com sua inteligência de decisão premium.
       res.json({ text: geminiResponse.text || "Desculpe, não consegui processar a informação neste momento." });
 
     } catch (err: any) {
-      console.error("Erro na API Gemini:", err);
+      console.error("Erro na API Gemini:", err.message || err);
       // Fallback response with simulated calculations
       const fallbackResponse = simulateKobayashiSensei(lastMessage, contextSummary, properties, revenues, expenses, bookings, assets, maintenances);
       res.json({ text: fallbackResponse });
@@ -658,7 +658,7 @@ Sua única saída DEVE SER um arquivo JSON puro, que siga o seguinte esquema Typ
       res.json(parsed);
 
     } catch (err: any) {
-      console.error("Erro no OCR Gemini:", err);
+      console.error("Erro no OCR Gemini:", err.message || err);
       const fallback = simulateOCRReader(imageBase64, properties);
       res.json(fallback);
     }
