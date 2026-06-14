@@ -28,6 +28,7 @@ interface SidebarProps {
   darkMode?: boolean;
   isOpen?: boolean;
   onClose?: () => void;
+  userRole?: string;
 }
 
 export function KobayashiLogo({ darkMode, className = "w-10 h-10 shrink-0" }: { darkMode: boolean; className?: string }) {
@@ -75,7 +76,7 @@ export function KobayashiLogo({ darkMode, className = "w-10 h-10 shrink-0" }: { 
   );
 }
 
-export default function Sidebar({ activeTab, setActiveTab, onOpenMobilePWA, darkMode = true, isOpen = false, onClose }: SidebarProps) {
+export default function Sidebar({ activeTab, setActiveTab, onOpenMobilePWA, darkMode = true, isOpen = false, onClose, userRole }: SidebarProps) {
   const [financeOpen, setFinanceOpen] = React.useState(true);
   const [isPWA, setIsPWA] = React.useState(false);
 
@@ -125,7 +126,7 @@ export default function Sidebar({ activeTab, setActiveTab, onOpenMobilePWA, dark
     { id: "reports", label: "Relatórios", icon: BarChart3 },
     { id: "ai-bot", label: "IA SelectSENSEI", icon: Sparkles, badge: "BETA" },
     { id: "documents", label: "Documentos", icon: FileText },
-    { id: "settings", label: "Configurações", icon: Settings },
+    ...(userRole === "admin" ? [{ id: "settings", label: "Configurações", icon: Settings }] : []),
   ];
 
   const renderNavButton = (item: { id: string; label: string; icon: React.ElementType; badge?: string }, indented = false) => {

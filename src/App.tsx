@@ -988,6 +988,7 @@ export default function App() {
         darkMode={darkMode}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
+        userRole={currentUser?.role}
       />
 
       <main id="app-workspace" className="flex-1 min-w-0 flex flex-col h-screen overflow-y-auto bg-[#FAFAFA] dark:bg-[#050B14]">
@@ -2922,7 +2923,7 @@ export default function App() {
                 </div>
               )}
 
-              {activeTab === "settings" && (
+              {activeTab === "settings" && currentUser?.role === 'admin' && (
                 <div id="tab-settings" className="space-y-6 font-sans">
                   <div className="border-b border-slate-800 pb-4">
                     <h2 className="font-display font-extrabold text-2xl text-white">Configurações Gerais do Escopo</h2>
