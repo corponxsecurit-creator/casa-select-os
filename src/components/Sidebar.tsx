@@ -110,7 +110,6 @@ export default function Sidebar({ activeTab, setActiveTab, onOpenMobilePWA, dark
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "properties", label: "Propriedades", icon: Building2 },
     { id: "calendar", label: "Calendário", icon: Calendar },
-    ...(!isPWA ? [{ id: "pwa-sim", label: "Central Mobile (PWA)", icon: Smartphone }] : []),
   ];
 
   const financeSubItems = [
@@ -234,6 +233,7 @@ export default function Sidebar({ activeTab, setActiveTab, onOpenMobilePWA, dark
           </div>
 
           {bottomNavItems.map((item) => renderNavButton(item))}
+          {!isPWA && renderNavButton({ id: "pwa-sim", label: "Central Mobile (PWA)", icon: Smartphone })}
         </div>
       </aside>
     </>
