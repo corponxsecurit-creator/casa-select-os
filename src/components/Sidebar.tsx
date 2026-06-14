@@ -106,7 +106,6 @@ export default function Sidebar({ activeTab, setActiveTab, onOpenMobilePWA, dark
   };
 
   const mainNavItems = [
-    { id: "cockpit", label: "Visão Geral", icon: PieChart },
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "properties", label: "Propriedades", icon: Building2 },
     { id: "calendar", label: "Calendário", icon: Calendar },

@@ -40,7 +40,11 @@ import {
   MapPin,
   CheckCircle2,
   AlertCircle,
-  Camera
+  Camera,
+  Sliders,
+  Trash2,
+  Edit3,
+  AlertTriangle
 } from "lucide-react";
 import { Property, Booking, Revenue, Expense, ExpenseCategory, Maintenance, Supplier, MaintenanceStatus, MaintenanceType } from "../types";
 import type { User as AppUser } from "../types";
@@ -224,7 +228,12 @@ export default function PWASimulator({
   currentUser
 }: PWASimulatorProps) {
   const [mobileScreen, setMobileScreen] = React.useState<"login" | "dashboard" | "ocr-scanner">("login");
-  const [mobileTab, setMobileTab] = React.useState<"ocr" | "calendar" | "properties">("ocr");
+  const [pwaFlow, setPwaFlow] = React.useState<"ocr-bookings" | "accounting-operations" | "executive-reports">("ocr-bookings");
+  const [mobileTab, setMobileTab] = React.useState<
+    "ocr" | "calendar" | "properties" | 
+    "finance" | "operations" | "suppliers" | 
+    "exec-dash" | "analytics" | "settings"
+  >("ocr");
   const [showPassword, setShowPassword] = React.useState(false);
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -455,7 +464,8 @@ export default function PWASimulator({
         date: extractedData.date,
         value: extractedData.value,
         paymentMethod: "Pix",
-        receipt: currentReceiptImage || "Lançamento via PWA (Gemini OCR)"
+        receipt: currentReceiptImage || "Lançamento via PWA (Gemini OCR)",
+        description: extractedData.description
       });
 
       setOcrSuccess(true);
@@ -672,7 +682,44 @@ export default function PWASimulator({
         {/* ═══════════════════════════════════════════════════ */}
         {/*  PHONE FRAME - Apple Inspired iPhone simulator     */}
         {/* ═══════════════════════════════════════════════════ */}
-        <div className="flex justify-center py-2 relative">
+        <div className="flex flex-col items-center gap-4 py-2 relative">
+          {/* Segmented Flow Selector */}
+          <div className="flex bg-slate-950/60 p-1 border border-slate-800/80 rounded-xl w-[330px] text-[9.5px] font-bold z-40 select-none shadow-lg">
+            <button
+              type="button"
+              onClick={() => { setPwaFlow("ocr-bookings"); setMobileTab("ocr"); }}
+              className={`flex-1 py-1.5 rounded-lg text-center cursor-pointer transition-all ${
+                pwaFlow === "ocr-bookings" 
+                  ? "bg-[#dfb26c] text-slate-950 shadow-md font-extrabold" 
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              OCR & Reservas
+            </button>
+            <button
+              type="button"
+              onClick={() => { setPwaFlow("accounting-operations"); setMobileTab("finance"); }}
+              className={`flex-1 py-1.5 rounded-lg text-center cursor-pointer transition-all ${
+                pwaFlow === "accounting-operations" 
+                  ? "bg-[#dfb26c] text-slate-950 shadow-md font-extrabold" 
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              Operações
+            </button>
+            <button
+              type="button"
+              onClick={() => { setPwaFlow("executive-reports"); setMobileTab("exec-dash"); }}
+              className={`flex-1 py-1.5 rounded-lg text-center cursor-pointer transition-all ${
+                pwaFlow === "executive-reports" 
+                  ? "bg-[#dfb26c] text-slate-950 shadow-md font-extrabold" 
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              Executivo
+            </button>
+          </div>
+
           <div className="relative">
             {/* Physical volume/power buttons on iPhone body */}
             <div className="absolute top-28 -left-[2px] w-[3px] h-10 bg-slate-500/80 rounded-l-md z-45" />
@@ -917,6 +964,12 @@ export default function PWASimulator({
                             {mobileTab === "ocr" && "OCR Financeiro"}
                             {mobileTab === "calendar" && "Calendário & Agenda"}
                             {mobileTab === "properties" && "Portfólio de Imóveis"}
+                            {mobileTab === "finance" && "Dashboard Financeiro"}
+                            {mobileTab === "operations" && "Operações"}
+                            {mobileTab === "suppliers" && "Cadastros"}
+                            {mobileTab === "exec-dash" && "Dashboard Principal"}
+                            {mobileTab === "analytics" && "Analytics & Reports"}
+                            {mobileTab === "settings" && "Documents & Settings"}
                           </span>
                         </div>
                       </div>
@@ -1407,6 +1460,443 @@ export default function PWASimulator({
                       </div>
                     )}
 
+                    {/* 💰 SCREEN 4: DASHBOARD FINANCEIRO */}
+                    {mobileTab === "finance" && (
+                      <div className="space-y-4 animate-fadeIn flex-1 flex flex-col pb-4 text-xs">
+                        <div className="text-center space-y-1">
+                          <h4 className="font-display font-extrabold text-xs text-slate-300 uppercase tracking-wider">Dashboard Financeiro</h4>
+                          <p className="text-[9px] text-slate-500">Métricas críticas de rentabilidade fiscal do portfólio.</p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2.5">
+                          {/* Card 1: Rendimentos Bruto */}
+                          <div className="rounded-xl p-3 flex flex-col justify-between h-24 shadow-md bg-gradient-to-br from-[#FFE082] via-[#FFD54F] to-[#D5A021] text-slate-950 border border-amber-300/30">
+                            <span className="text-[8.5px] uppercase font-bold tracking-wider opacity-85">Rendimentos Bruto</span>
+                            <strong className="text-xs font-black font-mono tracking-tight mt-auto block">
+                              R$ {totalRevenues > 0 ? totalRevenues.toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : "148.732,26"}
+                            </strong>
+                          </div>
+                          {/* Card 2: Deduções */}
+                          <div className="rounded-xl p-3 flex flex-col justify-between h-24 shadow-md bg-gradient-to-br from-[#FFE082] via-[#FFD54F] to-[#D5A021] text-slate-950 border border-amber-300/30">
+                            <span className="text-[8.5px] uppercase font-bold tracking-wider opacity-85">Deduções</span>
+                            <strong className="text-xs font-black font-mono tracking-tight mt-auto block">
+                              R$ {totalExpenses > 0 ? totalExpenses.toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : "34.639,20"}
+                            </strong>
+                          </div>
+                          {/* Card 3: Base Líquida */}
+                          <div className="rounded-xl p-3 flex flex-col justify-between h-24 shadow-md bg-gradient-to-br from-[#FFE082] via-[#FFD54F] to-[#D5A021] text-slate-950 border border-amber-300/30">
+                            <span className="text-[8.5px] uppercase font-bold tracking-wider opacity-85">Base Líquida</span>
+                            <strong className="text-xs font-black font-mono tracking-tight mt-auto block">
+                              R$ {netProfit > 0 ? netProfit.toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : "114.093,06"}
+                            </strong>
+                          </div>
+                          {/* Card 4: Imposto Estimado */}
+                          <div className="rounded-xl p-3 flex flex-col justify-between h-24 shadow-md bg-gradient-to-br from-[#FFE082] via-[#FFD54F] to-[#D5A021] text-slate-950 border border-amber-300/30">
+                            <span className="text-[8.5px] uppercase font-bold tracking-wider opacity-85">Imposto Estimado</span>
+                            <strong className="text-xs font-black font-mono tracking-tight mt-auto block">
+                              R$ {totalRevenues > 0 ? (netProfit * 0.275).toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : "29.583,29"}
+                            </strong>
+                          </div>
+                        </div>
+
+                        {/* Ações rápidas na parte inferior */}
+                        <div className="flex gap-2 pt-2 mt-auto">
+                          <button
+                            type="button"
+                            onClick={() => { setMobileTab("ocr"); triggerToast("Tire foto ou anexe comprovante!"); }}
+                            className="flex-1 bg-white hover:bg-slate-100 text-slate-950 rounded-xl py-2.5 text-[10px] font-extrabold cursor-pointer transition-all border border-slate-350"
+                          >
+                            Anexar Comprovante
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setPwaFlow("executive-reports"); setMobileTab("analytics"); }}
+                            className="flex-1 bg-slate-900 border border-slate-800 text-white hover:bg-slate-850 rounded-xl py-2.5 text-[10px] font-extrabold cursor-pointer transition-all"
+                          >
+                            Relatórios
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 🔧 SCREEN 5: OPERAÇÕES */}
+                    {mobileTab === "operations" && (
+                      <div className="space-y-4 animate-fadeIn flex-1 flex flex-col pb-4 text-xs">
+                        <div className="text-center space-y-1">
+                          <h4 className="font-display font-extrabold text-xs text-slate-300 uppercase tracking-wider">Operações</h4>
+                          <p className="text-[9px] text-slate-500">Monitoramento e controle de intervenções e manutenções ativas.</p>
+                        </div>
+
+                        <div className="space-y-2.5 overflow-y-auto max-h-[300px] scrollbar-none">
+                          {(() => {
+                            const defaultMaintenances: Maintenance[] = [
+                              {
+                                id: "maint-1",
+                                propertyId: "casa-mayla",
+                                title: "Limpeza da piscina - Casa Mayla - EM ANDAMENTO",
+                                type: "preventive" as any,
+                                status: "in_progress" as any,
+                                date: "2026-06-13",
+                                cost: 450
+                              },
+                              {
+                                id: "maint-2",
+                                propertyId: "casa-lilian",
+                                title: "Ar condicionado - Casa Lilian - AGENDADA",
+                                type: "preventive" as any,
+                                status: "scheduled" as any,
+                                date: "2026-06-15",
+                                cost: 800
+                              }
+                            ];
+                            const displayMaintenances = maintenances && maintenances.length > 0 ? maintenances : defaultMaintenances;
+                            return displayMaintenances.map((m) => {
+                              const prop = properties.find(p => p.id === m.propertyId);
+                              const propName = prop ? prop.name : (m.propertyId === "casa-mayla" ? "Casa Mayla" : "Casa Lilian");
+                              
+                              let badgeColor = "bg-orange-500/10 text-orange-400 border-orange-500/20";
+                              
+                              return (
+                                <div key={m.id} className="p-3 bg-slate-950/50 border border-slate-850 rounded-xl space-y-2">
+                                  <div className="flex justify-between items-center">
+                                    <span className={`text-[8px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${badgeColor}`}>
+                                      Preventiva
+                                    </span>
+                                    <strong className="text-[10px] text-slate-200 font-mono">
+                                      R$ {m.cost.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                                    </strong>
+                                  </div>
+                                  <div>
+                                    <h5 className="text-[10px] font-bold text-slate-100 leading-tight">
+                                      {m.title}
+                                    </h5>
+                                    <span className="text-[8px] text-slate-500 block mt-1 font-semibold">
+                                      Propriedade: {propName}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => triggerToast("Formulário de Nova Intervenção")}
+                          className="w-full bg-[#dfb26c] hover:bg-[#c89e58] text-slate-950 rounded-xl py-2.5 text-[10px] font-extrabold cursor-pointer transition-all mt-auto"
+                        >
+                          + Lançar Intervenção
+                        </button>
+                      </div>
+                    )}
+
+                    {/* 👤 SCREEN 6: CADASTROS (FORNECEDORES) */}
+                    {mobileTab === "suppliers" && (
+                      <div className="space-y-4 animate-fadeIn flex-1 flex flex-col pb-4 text-xs">
+                        <div className="text-center space-y-1">
+                          <h4 className="font-display font-extrabold text-xs text-slate-300 uppercase tracking-wider">Fornecedores</h4>
+                          <p className="text-[9px] text-slate-500">Diretório de prestadores de serviço e parceiros locais.</p>
+                        </div>
+
+                        <div className="space-y-2.5 overflow-y-auto max-h-[300px] scrollbar-none">
+                          {(() => {
+                            const defaultSuppliers: Supplier[] = [
+                              {
+                                id: "sup-1",
+                                name: "AcquaClean Pools",
+                                specialty: "Piscineiro",
+                                contactName: "Roberto",
+                                phone: "Ras - 29.834,490"
+                              },
+                              {
+                                id: "sup-2",
+                                name: "Dona Maria Zeladoria",
+                                specialty: "Limpeza",
+                                contactName: "Maria",
+                                phone: "Bas - 42.558,240"
+                              },
+                              {
+                                id: "sup-3",
+                                name: "ClimaMax Refrigeração",
+                                specialty: "Ar-Condicionado",
+                                contactName: "Marcio",
+                                phone: "Cas - 39.580,990"
+                              }
+                            ];
+                            const displaySuppliers = suppliers && suppliers.length > 0 ? suppliers : defaultSuppliers;
+                            return displaySuppliers.map((s) => (
+                              <div key={s.id} className="p-3 bg-slate-950/50 border border-slate-850 rounded-xl flex items-center justify-between">
+                                <div className="space-y-1 min-w-0">
+                                  <strong className="block text-[10px] text-slate-100 truncate">{s.name} - {s.specialty}</strong>
+                                  <span className="text-[9.5px] text-cyan-400 font-mono font-bold block">{s.phone}</span>
+                                </div>
+                                <div className="flex gap-1 shrink-0">
+                                  <button 
+                                    type="button"
+                                    onClick={() => triggerToast(`Editar ${s.name}`)}
+                                    className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white cursor-pointer"
+                                  >
+                                    <Edit3 size={11} />
+                                  </button>
+                                  <button 
+                                    type="button"
+                                    onClick={() => triggerToast(`Excluir ${s.name}`)}
+                                    className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-red-400 hover:text-red-300 cursor-pointer"
+                                  >
+                                    <Trash2 size={11} />
+                                  </button>
+                                </div>
+                              </div>
+                            ));
+                          })()}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => triggerToast("Formulário de Novo Fornecedor")}
+                          className="w-full bg-[#dfb26c] hover:bg-[#c89e58] text-slate-950 rounded-xl py-2.5 text-[10px] font-extrabold cursor-pointer transition-all mt-auto"
+                        >
+                          + Novo Fornecedor
+                        </button>
+                      </div>
+                    )}
+
+                    {/* 👑 SCREEN 7: DASHBOARD PRINCIPAL (EXECUTIVO) */}
+                    {mobileTab === "exec-dash" && (
+                      <div className="space-y-4 animate-fadeIn flex-1 flex flex-col pb-4 text-xs">
+                        <div className="text-center space-y-1">
+                          <h4 className="font-display font-extrabold text-xs text-slate-300 uppercase tracking-wider">Resumo Executivo</h4>
+                          <p className="text-[9px] text-slate-500">Situação consolidada do caixa e provisão de tributos.</p>
+                        </div>
+
+                        <div className="space-y-2">
+                          {/* Card 1: Rendimentos Bruto */}
+                          <div className="rounded-xl p-3 flex justify-between items-center shadow-md bg-gradient-to-r from-[#FFE082] via-[#FFD54F] to-[#D5A021] text-slate-950 border border-amber-300/30">
+                            <div>
+                              <span className="text-[8px] uppercase font-black tracking-wider opacity-85">Rendimentos Bruto</span>
+                              <strong className="text-xs font-black font-mono tracking-tight block mt-0.5">
+                                R$ {totalRevenues > 0 ? totalRevenues.toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : "148.732,26"}
+                              </strong>
+                            </div>
+                            <ArrowUpRight size={15} className="opacity-80 shrink-0" />
+                          </div>
+                          {/* Card 2: Deduções */}
+                          <div className="rounded-xl p-3 flex justify-between items-center shadow-md bg-gradient-to-r from-[#FFE082] via-[#FFD54F] to-[#D5A021] text-slate-950 border border-amber-300/30">
+                            <div>
+                              <span className="text-[8px] uppercase font-black tracking-wider opacity-85">Deduções</span>
+                              <strong className="text-xs font-black font-mono tracking-tight block mt-0.5">
+                                R$ {totalExpenses > 0 ? totalExpenses.toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : "34.639,20"}
+                              </strong>
+                            </div>
+                            <TrendingDown size={15} className="opacity-80 shrink-0" />
+                          </div>
+                          {/* Card 3: Base Líquida */}
+                          <div className="rounded-xl p-3 flex justify-between items-center shadow-md bg-gradient-to-r from-[#FFE082] via-[#FFD54F] to-[#D5A021] text-slate-950 border border-amber-300/30">
+                            <div>
+                              <span className="text-[8px] uppercase font-black tracking-wider opacity-85">Base Líquida</span>
+                              <strong className="text-xs font-black font-mono tracking-tight block mt-0.5">
+                                R$ {netProfit > 0 ? netProfit.toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : "114.093,06"}
+                              </strong>
+                            </div>
+                            <TrendingUp size={15} className="opacity-80 shrink-0" />
+                          </div>
+                          {/* Card 4: Imposto Estimado */}
+                          <div className="rounded-xl p-3 flex justify-between items-center shadow-md bg-gradient-to-r from-[#FFE082] via-[#FFD54F] to-[#D5A021] text-slate-950 border border-amber-300/30">
+                            <div>
+                              <span className="text-[8px] uppercase font-black tracking-wider opacity-85">Imposto Estimado</span>
+                              <strong className="text-xs font-black font-mono tracking-tight block mt-0.5">
+                                R$ {totalRevenues > 0 ? (netProfit * 0.275).toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : "29.583,29"}
+                              </strong>
+                            </div>
+                            <Info size={15} className="opacity-80 shrink-0" />
+                          </div>
+                        </div>
+
+                        {/* Ações rápidas na parte inferior */}
+                        <div className="grid grid-cols-3 gap-1.5 pt-2 mt-auto">
+                          <button
+                            type="button"
+                            onClick={() => triggerToast("Nova Cobrança")}
+                            className="bg-white hover:bg-slate-100 text-slate-950 rounded-lg py-2 text-[8.5px] font-extrabold cursor-pointer transition-all border border-slate-350 text-center"
+                          >
+                            Nova Cobrança
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setMobileTab("properties"); triggerToast("Abra aba imóveis para gerenciar!"); }}
+                            className="bg-white hover:bg-slate-100 text-slate-950 rounded-lg py-2 text-[8.5px] font-extrabold cursor-pointer transition-all border border-slate-350 text-center"
+                          >
+                            Adic. Imóvel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setMobileTab("analytics")}
+                            className="bg-white hover:bg-slate-100 text-slate-950 rounded-lg py-2 text-[8.5px] font-extrabold cursor-pointer transition-all border border-slate-350 text-center"
+                          >
+                            Relatórios
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 📊 SCREEN 8: ANALYTICS & REPORTS */}
+                    {mobileTab === "analytics" && (
+                      <div className="space-y-4 animate-fadeIn flex-1 flex flex-col pb-4 text-xs">
+                        <div className="text-center space-y-1">
+                          <h4 className="font-display font-extrabold text-xs text-slate-300 uppercase tracking-wider">Analytics & Reports</h4>
+                          <p className="text-[9px] text-slate-500">Visualização de performance e lucratividade por propriedade.</p>
+                        </div>
+
+                        <div className="space-y-3.5 overflow-y-auto max-h-[320px] scrollbar-none flex-1">
+                          {/* Chart 1: Receita por Imóvel (Turquesa) */}
+                          <div className="bg-slate-950/50 border border-slate-850 rounded-xl p-3.5 space-y-2">
+                            <span className="text-[8.5px] uppercase font-bold text-slate-500 block">Receita por Imóvel (K R$)</span>
+                            <div className="flex justify-around items-end h-24 pt-4 border-b border-slate-800">
+                              {[
+                                { name: "Casa Nova", val: 85, display: "10" },
+                                { name: "Predinho", val: 95, display: "10" },
+                                { name: "Casa Coast", val: 90, display: "11" }
+                              ].map((bar, i) => (
+                                <div key={i} className="flex flex-col items-center w-12 group">
+                                  <span className="text-[7.5px] font-mono font-bold text-cyan-400 mb-1">{bar.display}</span>
+                                  <div 
+                                    className="w-4 bg-gradient-to-t from-cyan-600 to-cyan-400 rounded-t transition-all duration-300 group-hover:brightness-110" 
+                                    style={{ height: `${bar.val * 0.4}px` }}
+                                  />
+                                  <span className="text-[7px] text-slate-500 text-center truncate w-full mt-1 font-semibold leading-none">{bar.name}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Chart 2: Lucratividade vs Custos (Laranja/Vermelho) */}
+                          <div className="bg-slate-950/50 border border-slate-850 rounded-xl p-3.5 space-y-2">
+                            <span className="text-[8.5px] uppercase font-bold text-slate-500 block">Lucratividade vs Custos</span>
+                            <div className="flex justify-around items-end h-24 pt-4 border-b border-slate-800">
+                              {[
+                                { name: "Lucro Líquido", val: 90, display: "14", color: "from-orange-500 to-orange-400", txtColor: "text-orange-400" },
+                                { name: "Custos Operac.", val: 65, display: "10", color: "from-rose-500 to-rose-400", txtColor: "text-rose-400" }
+                              ].map((bar, i) => (
+                                <div key={i} className="flex flex-col items-center w-16 group">
+                                  <span className={`text-[7.5px] font-mono font-bold ${bar.txtColor} mb-1`}>{bar.display}</span>
+                                  <div 
+                                    className={`w-5 bg-gradient-to-t ${bar.color} rounded-t transition-all duration-300 group-hover:brightness-110`} 
+                                    style={{ height: `${bar.val * 0.4}px` }}
+                                  />
+                                  <span className="text-[7px] text-slate-500 text-center truncate w-full mt-1 font-semibold leading-none">{bar.name}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ⚙️ SCREEN 9: DOCUMENTS & SETTINGS */}
+                    {mobileTab === "settings" && (
+                      <div className="space-y-4 animate-fadeIn flex-1 flex flex-col pb-4 text-xs">
+                        <div className="text-center space-y-1">
+                          <h4 className="font-display font-extrabold text-xs text-slate-300 uppercase tracking-wider">Documents & Settings</h4>
+                          <p className="text-[9px] text-slate-500">Gestão documental e configurações administrativas de webhook.</p>
+                        </div>
+
+                        <div className="space-y-3.5 overflow-y-auto max-h-[300px] scrollbar-none flex-1">
+                          {/* Documentos */}
+                          <div className="bg-slate-950/50 border border-slate-850 rounded-xl p-3 space-y-2">
+                            <span className="text-[8.5px] uppercase font-bold text-slate-500 block">Gestão de Documentos</span>
+                            <div className="space-y-2">
+                              {[
+                                { name: "Regulamento_Villa_Lilian.pdf", size: "1.2 MB" },
+                                { name: "Contrato_Itaú_XP_Corp.pdf", size: "3.4 MB" }
+                              ].map((doc, i) => (
+                                <div key={i} className="p-2 bg-slate-900 border border-slate-850 rounded-lg flex items-center justify-between">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <FileText size={14} className="text-red-400 shrink-0" />
+                                    <div className="min-w-0">
+                                      <strong className="block text-[9px] text-slate-200 truncate">{doc.name}</strong>
+                                      <span className="text-[7.5px] text-slate-500 block">{doc.size}</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-1">
+                                    <button 
+                                      type="button"
+                                      onClick={() => triggerToast(`Editar ${doc.name}`)}
+                                      className="px-1.5 py-0.5 rounded text-[8px] bg-slate-950 border border-slate-800 text-slate-400 hover:text-white cursor-pointer"
+                                    >
+                                      Editor
+                                    </button>
+                                    <button 
+                                      type="button"
+                                      onClick={() => triggerToast(`Excluir ${doc.name}`)}
+                                      className="px-1.5 py-0.5 rounded text-[8px] bg-slate-950 border border-slate-800 text-red-400 hover:text-red-300 cursor-pointer"
+                                    >
+                                      Exclui
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Configurações */}
+                          <div className="bg-slate-950/50 border border-slate-850 rounded-xl p-3 space-y-2.5">
+                            <span className="text-[8.5px] uppercase font-bold text-slate-500 block">Configurações Gerais</span>
+                            <div className="space-y-2 text-[9.5px]">
+                              <div>
+                                <label className="text-[7.5px] text-slate-500 font-bold block mb-0.5 uppercase">Empresa</label>
+                                <input 
+                                  type="text" 
+                                  defaultValue="Casa Select" 
+                                  className="w-full bg-slate-900 border border-slate-800 p-1.5 rounded text-white text-[9px] focus:outline-none"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[7.5px] text-slate-500 font-bold block mb-0.5 uppercase">Moeda</label>
+                                <select className="w-full bg-slate-900 border border-slate-800 p-1.5 rounded text-white text-[9px] focus:outline-none">
+                                  <option>BRL (R$)</option>
+                                  <option>USD ($)</option>
+                                  <option>EUR (€)</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="text-[7.5px] text-slate-500 font-bold block mb-0.5 uppercase">Idioma</label>
+                                <select className="w-full bg-slate-900 border border-slate-800 p-1.5 rounded text-white text-[9px] focus:outline-none">
+                                  <option>Português (BR)</option>
+                                  <option>English (US)</option>
+                                  <option>Español (ES)</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="text-[7.5px] text-slate-500 font-bold block mb-0.5 uppercase">WhatsApp Webhook</label>
+                                <input 
+                                  type="text" 
+                                  defaultValue="https://api.whatsapp.com/send?phone=..." 
+                                  className="w-full bg-slate-900 border border-slate-800 p-1.5 rounded text-white font-mono text-[9px] focus:outline-none"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Ações */}
+                        <div className="flex gap-2 pt-1 mt-auto">
+                          <button
+                            type="button"
+                            onClick={() => triggerToast("Novo Documento")}
+                            className="w-2/5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg py-2 text-[9px] font-bold cursor-pointer transition-all flex items-center justify-center gap-1"
+                          >
+                            <Plus size={10} /> Novo Doc.
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => triggerToast("Configurações Salvas!")}
+                            className="w-3/5 bg-gradient-to-r from-[#dfb26c] to-[#c89e58] text-slate-950 font-black rounded-lg py-2 text-[9px] cursor-pointer transition-all shadow-md"
+                          >
+                            Salvar Configurações
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
                                    {/* Floating Action Button (FAB) */}
@@ -1490,44 +1980,143 @@ export default function PWASimulator({
                     boxShadow: isDark ? "0 -4px 15px rgba(0,0,0,0.5)" : "0 -2px 10px rgba(0,0,0,0.03)"
                   }}
                 >
-                  {/* OCR Tab */}
-                  <button 
-                    onClick={() => setMobileTab("ocr")} 
-                    className="flex flex-col items-center justify-center w-16 h-11 transition-all cursor-pointer relative"
-                    style={{ color: mobileTab === "ocr" ? c.accent : c.textMuted }}
-                  >
-                    <Camera size={17} strokeWidth={mobileTab === "ocr" ? 2.5 : 1.8} />
-                    <span className="text-[8px] font-bold mt-0.5">Leitor OCR</span>
-                    {mobileTab === "ocr" && (
-                      <span className="absolute bottom-0 w-1.5 h-1.5 rounded-full bg-[#dfb26c] animate-bounce" />
-                    )}
-                  </button>
+                  {pwaFlow === "ocr-bookings" && (
+                    <>
+                      {/* OCR Tab */}
+                      <button 
+                        type="button"
+                        onClick={() => setMobileTab("ocr")} 
+                        className="flex flex-col items-center justify-center w-16 h-11 transition-all cursor-pointer relative"
+                        style={{ color: mobileTab === "ocr" ? c.accent : c.textMuted }}
+                      >
+                        <Camera size={17} strokeWidth={mobileTab === "ocr" ? 2.5 : 1.8} />
+                        <span className="text-[8px] font-bold mt-0.5">Leitor OCR</span>
+                        {mobileTab === "ocr" && (
+                          <span className="absolute bottom-0 w-1.5 h-1.5 rounded-full bg-[#dfb26c] animate-bounce" />
+                        )}
+                      </button>
 
-                  {/* Calendar Tab */}
-                  <button 
-                    onClick={() => setMobileTab("calendar")} 
-                    className="flex flex-col items-center justify-center w-16 h-11 transition-all cursor-pointer relative"
-                    style={{ color: mobileTab === "calendar" ? c.accent : c.textMuted }}
-                  >
-                    <Calendar size={17} strokeWidth={mobileTab === "calendar" ? 2.5 : 1.8} />
-                    <span className="text-[8px] font-bold mt-0.5">Calendário</span>
-                    {mobileTab === "calendar" && (
-                      <span className="absolute bottom-0 w-1.5 h-1.5 rounded-full bg-[#dfb26c] animate-bounce" />
-                    )}
-                  </button>
+                      {/* Calendar Tab */}
+                      <button 
+                        type="button"
+                        onClick={() => setMobileTab("calendar")} 
+                        className="flex flex-col items-center justify-center w-16 h-11 transition-all cursor-pointer relative"
+                        style={{ color: mobileTab === "calendar" ? c.accent : c.textMuted }}
+                      >
+                        <Calendar size={17} strokeWidth={mobileTab === "calendar" ? 2.5 : 1.8} />
+                        <span className="text-[8px] font-bold mt-0.5">Calendário</span>
+                        {mobileTab === "calendar" && (
+                          <span className="absolute bottom-0 w-1.5 h-1.5 rounded-full bg-[#dfb26c] animate-bounce" />
+                        )}
+                      </button>
 
-                  {/* Properties Tab */}
-                  <button 
-                    onClick={() => setMobileTab("properties")} 
-                    className="flex flex-col items-center justify-center w-16 h-11 transition-all cursor-pointer relative"
-                    style={{ color: mobileTab === "properties" ? c.accent : c.textMuted }}
-                  >
-                    <Building2 size={17} strokeWidth={mobileTab === "properties" ? 2.5 : 1.8} />
-                    <span className="text-[8px] font-bold mt-0.5">Imóveis</span>
-                    {mobileTab === "properties" && (
-                      <span className="absolute bottom-0 w-1.5 h-1.5 rounded-full bg-[#dfb26c] animate-bounce" />
-                    )}
-                  </button>
+                      {/* Properties Tab */}
+                      <button 
+                        type="button"
+                        onClick={() => setMobileTab("properties")} 
+                        className="flex flex-col items-center justify-center w-16 h-11 transition-all cursor-pointer relative"
+                        style={{ color: mobileTab === "properties" ? c.accent : c.textMuted }}
+                      >
+                        <Building2 size={17} strokeWidth={mobileTab === "properties" ? 2.5 : 1.8} />
+                        <span className="text-[8px] font-bold mt-0.5">Imóveis</span>
+                        {mobileTab === "properties" && (
+                          <span className="absolute bottom-0 w-1.5 h-1.5 rounded-full bg-[#dfb26c] animate-bounce" />
+                        )}
+                      </button>
+                    </>
+                  )}
+
+                  {pwaFlow === "accounting-operations" && (
+                    <>
+                      {/* Finance Tab */}
+                      <button 
+                        type="button"
+                        onClick={() => setMobileTab("finance")} 
+                        className="flex flex-col items-center justify-center w-16 h-11 transition-all cursor-pointer relative"
+                        style={{ color: mobileTab === "finance" ? c.accent : c.textMuted }}
+                      >
+                        <DollarSign size={17} strokeWidth={mobileTab === "finance" ? 2.5 : 1.8} />
+                        <span className="text-[8px] font-bold mt-0.5">Financeiro</span>
+                        {mobileTab === "finance" && (
+                          <span className="absolute bottom-0 w-1.5 h-1.5 rounded-full bg-[#dfb26c] animate-bounce" />
+                        )}
+                      </button>
+
+                      {/* Operations Tab */}
+                      <button 
+                        type="button"
+                        onClick={() => setMobileTab("operations")} 
+                        className="flex flex-col items-center justify-center w-16 h-11 transition-all cursor-pointer relative"
+                        style={{ color: mobileTab === "operations" ? c.accent : c.textMuted }}
+                      >
+                        <Wrench size={17} strokeWidth={mobileTab === "operations" ? 2.5 : 1.8} />
+                        <span className="text-[8px] font-bold mt-0.5">Operações</span>
+                        {mobileTab === "operations" && (
+                          <span className="absolute bottom-0 w-1.5 h-1.5 rounded-full bg-[#dfb26c] animate-bounce" />
+                        )}
+                      </button>
+
+                      {/* Suppliers Tab */}
+                      <button 
+                        type="button"
+                        onClick={() => setMobileTab("suppliers")} 
+                        className="flex flex-col items-center justify-center w-16 h-11 transition-all cursor-pointer relative"
+                        style={{ color: mobileTab === "suppliers" ? c.accent : c.textMuted }}
+                      >
+                        <User size={17} strokeWidth={mobileTab === "suppliers" ? 2.5 : 1.8} />
+                        <span className="text-[8px] font-bold mt-0.5">Fornecedores</span>
+                        {mobileTab === "suppliers" && (
+                          <span className="absolute bottom-0 w-1.5 h-1.5 rounded-full bg-[#dfb26c] animate-bounce" />
+                        )}
+                      </button>
+                    </>
+                  )}
+
+                  {pwaFlow === "executive-reports" && (
+                    <>
+                      {/* Exec Dash Tab */}
+                      <button 
+                        type="button"
+                        onClick={() => setMobileTab("exec-dash")} 
+                        className="flex flex-col items-center justify-center w-16 h-11 transition-all cursor-pointer relative"
+                        style={{ color: mobileTab === "exec-dash" ? c.accent : c.textMuted }}
+                      >
+                        <Home size={17} strokeWidth={mobileTab === "exec-dash" ? 2.5 : 1.8} />
+                        <span className="text-[8px] font-bold mt-0.5">Dashboard</span>
+                        {mobileTab === "exec-dash" && (
+                          <span className="absolute bottom-0 w-1.5 h-1.5 rounded-full bg-[#dfb26c] animate-bounce" />
+                        )}
+                      </button>
+
+                      {/* Analytics Tab */}
+                      <button 
+                        type="button"
+                        onClick={() => setMobileTab("analytics")} 
+                        className="flex flex-col items-center justify-center w-16 h-11 transition-all cursor-pointer relative"
+                        style={{ color: mobileTab === "analytics" ? c.accent : c.textMuted }}
+                      >
+                        <BarChart3 size={17} strokeWidth={mobileTab === "analytics" ? 2.5 : 1.8} />
+                        <span className="text-[8px] font-bold mt-0.5">Relatórios</span>
+                        {mobileTab === "analytics" && (
+                          <span className="absolute bottom-0 w-1.5 h-1.5 rounded-full bg-[#dfb26c] animate-bounce" />
+                        )}
+                      </button>
+
+                      {/* Settings Tab */}
+                      <button 
+                        type="button"
+                        onClick={() => setMobileTab("settings")} 
+                        className="flex flex-col items-center justify-center w-16 h-11 transition-all cursor-pointer relative"
+                        style={{ color: mobileTab === "settings" ? c.accent : c.textMuted }}
+                      >
+                        <Sliders size={17} strokeWidth={mobileTab === "settings" ? 2.5 : 1.8} />
+                        <span className="text-[8px] font-bold mt-0.5">Ajustes</span>
+                        {mobileTab === "settings" && (
+                          <span className="absolute bottom-0 w-1.5 h-1.5 rounded-full bg-[#dfb26c] animate-bounce" />
+                        )}
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
 

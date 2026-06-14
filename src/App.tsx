@@ -52,6 +52,8 @@ const PWASimulator = React.lazy(() => import("./components/PWASimulator"));
 const IncomeTaxView = React.lazy(() => import("./components/IncomeTaxView"));
 import { LoginScreen } from "./components/LoginScreen";
 import { CEOCockpit } from "./components/CEOCockpit";
+import PWAPersonalizado from "./components/PWAPersonalizado";
+import DocumentsModule from "./components/DocumentsModule";
 import { 
   getAlerts,
   addProperty, addRevenue, addExpense, addBooking, addAsset, addMaintenance, deleteExpense,
@@ -110,11 +112,35 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = React.useState<boolean>(false);
   const [currentUser, setCurrentUser] = React.useState<User | null>(null);
 
-  React.useEffect(() => {
-    if (currentUser?.role === 'admin') {
-      setActiveTab("cockpit");
+  // Check if URL matches /pwa/ceo, /pwa/comercial, /pwa/financeiro, or /pwa/administrativo
+  const [pwaRole, setPwaRole] = React.useState<"ceo" | "comercial" | "financeiro" | "administrativo" | null>(() => {
+    const path = window.location.pathname.toLowerCase();
+    if (path.startsWith("/pwa/")) {
+      const role = path.split("/")[2];
+      if (["ceo", "comercial", "financeiro", "administrativo"].includes(role)) {
+        return role as any;
+      }
     }
-  }, [currentUser]);
+    return null;
+  });
+
+  React.useEffect(() => {
+    const handleLocationChange = () => {
+      const path = window.location.pathname.toLowerCase();
+      if (path.startsWith("/pwa/")) {
+        const role = path.split("/")[2];
+        if (["ceo", "comercial", "financeiro", "administrativo"].includes(role)) {
+          setPwaRole(role as any);
+          return;
+        }
+      }
+      setPwaRole(null);
+    };
+    window.addEventListener("popstate", handleLocationChange);
+    return () => window.removeEventListener("popstate", handleLocationChange);
+  }, []);
+
+  // Default tab is dashboard for all desktop users
   const [showPasswordChange, setShowPasswordChange] = React.useState(false);
   const [newPassword, setNewPassword] = React.useState("");
   const [passwordChangeMessage, setPasswordChangeMessage] = React.useState("");
@@ -889,6 +915,26 @@ export default function App() {
     { month: "Abr/26", receitas: 126540.89, despesas: 54720.49 }
   ];
 
+  if (pwaRole) {
+    return (
+      <PWAPersonalizado 
+        properties={properties}
+        bookings={bookings}
+        expenses={expenses}
+        revenues={revenues}
+        maintenances={maintenances}
+        suppliers={suppliers}
+        onDataChanged={refreshDatabase}
+        darkMode={darkMode}
+        rolePath={pwaRole}
+        onBackToDesktop={() => {
+          setPwaRole(null);
+          window.history.pushState({}, "", "/");
+        }}
+      />
+    );
+  }
+
   if (!currentUser) {
     return <LoginScreen onLogin={setCurrentUser} darkMode={darkMode} />;
   }
@@ -1170,12 +1216,6 @@ export default function App() {
           ) : (
             // Custom Active tab switch
             <>
-              {activeTab === "cockpit" && (
-                <div id="tab-cockpit">
-                  <CEOCockpit />
-                </div>
-              )}
-
               {activeTab === "dashboard" && (
                 <div id="tab-dashboard" className="space-y-6">
 
@@ -2872,51 +2912,13 @@ export default function App() {
               )}
 
               {activeTab === "documents" && (
-                <div id="tab-documents" className="space-y-6">
-                  <div className="flex justify-between items-center border-b border-slate-800 pb-4">
-                    <div>
-                      <h2 className="font-display font-extrabold text-2xl text-white">Central de Arquivos e Documentos</h2>
-                      <p className="text-xs text-slate-400 mt-0.5 font-sans">Contratos de locação assinados, acordos estaduais, manuais corporativos do proprietário.</p>
-                    </div>
-                    <button
-                      onClick={() => handleOpenForm("document")}
-                      className="bg-accent-purple hover:bg-accent-purple-hover text-white rounded-lg px-4 py-2 text-xs font-semibold cursor-pointer transition-all"
-                    >
-                      + Novo Documento
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {documents.map(d => (
-                      <div key={d.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-col justify-between space-y-3 hover:border-slate-750 transition-all">
-                        <div className="flex items-start gap-3">
-                          <FileText size={24} className="text-accent-cyan mt-1 shrink-0" />
-                          <div className="min-w-0 flex-1">
-                            <h4 className="font-sans font-bold text-xs text-white truncate" title={d.name}>{d.name}</h4>
-                            <span className="text-[10px] text-slate-450 block mt-0.5">{d.description}</span>
-                            <span className="text-[9px] text-slate-500 font-mono block mt-1">Tipo: {d.type} • {d.fileSize || "1.0 MB"}</span>
-                          </div>
-                        </div>
-                        <div className="flex gap-2 pt-2 border-t border-slate-850/50 mt-1 select-none">
-                          <button
-                            onClick={() => handleOpenForm("document", undefined, d)}
-                            className="w-1/2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 rounded py-1 font-semibold text-[10px] cursor-pointer transition-all flex items-center justify-center gap-1"
-                          >
-                            <Sparkles size={10} /> Editar
-                          </button>
-                          <button
-                            onClick={() => handleDeleteDocument(d.id)}
-                            className="w-1/2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded py-1 font-semibold text-[10px] cursor-pointer transition-all flex items-center justify-center gap-1"
-                          >
-                            <Trash2 size={10} /> Excluir
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    {documents.length === 0 && (
-                      <p className="col-span-4 text-center text-xs text-slate-500 py-10">Nenhum documento anexado.</p>
-                    )}
-                  </div>
+                <div id="tab-documents">
+                  <DocumentsModule 
+                    documents={documents}
+                    onOpenForm={handleOpenForm}
+                    onDeleteDocument={handleDeleteDocument}
+                    darkMode={darkMode}
+                  />
                 </div>
               )}
 
